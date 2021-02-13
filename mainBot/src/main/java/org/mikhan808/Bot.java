@@ -148,7 +148,7 @@ public class Bot extends TelegramLongPollingBot {
                             sb.append(userChats.get(i).getName());
                             sb.append(" (");
                             if (userChats.get(i).getTable().size() > 1) {
-                                sb.append(userChats.get(i).getTable().get(0)).append(", ").append(sb.append(userChats.get(i).getTable().get(1)));
+                                sb.append(userChats.get(i).getTable().get(0)).append(", ").append(userChats.get(i).getTable().get(1));
                             } else {
                                 sb.append(userChats.get(i).getTable().get(0));
                             }
@@ -246,16 +246,16 @@ public class Bot extends TelegramLongPollingBot {
                         }
                         sendTextToAll(sb.toString());
                         boolean end =false;
-                        if(indexActivePlayer<userChats.size())
+                        if (indexActivePlayer < userChats.size() - 1)
                             indexActivePlayer++;
                         else if (countRounds == 0) {
                             sendTextToAll("Конец игры");
-                            end =true;
+                            end = true;
                         } else {
                             countRounds--;
                             indexActivePlayer = 0;
                         }
-                        if(!end) {
+                        if (!end) {
                             for (UserChat userChat : userChats)
                                 userChat.resetTable();
                             sendTextToAll("Следующий раунд");
