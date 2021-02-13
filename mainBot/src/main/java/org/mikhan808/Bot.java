@@ -133,15 +133,15 @@ public class Bot extends TelegramLongPollingBot {
                 if(msg.getText().equals(BEGIN_DISCUSSION))
                 {
                     countVotePlayers = 0;
-                    for (UserChat userChat:userChats)
-                    {
+                    sendTextToAll("Ассоциация:");
+                    sendTextToAll(associate);
+                    for (UserChat userChat : userChats) {
                         userChat.resetVotes();
                         userChat.setGuessed(false);
-                        if(userChat.getStatus()==UserChat.ACTIVE_PLAYER_X) {
+                        if (userChat.getStatus() == UserChat.ACTIVE_PLAYER_X) {
                             userChat.setStatus(UserChat.OK);
-                            sendText(userChat.getId(),"Объясните почему Вы положили именно эти карточки и ждите результата голосования");
-                        }
-                        else {
+                            sendText(userChat.getId(), "Объясните почему Вы положили именно эти карточки и ждите результата голосования");
+                        } else {
                             userChat.setStatus(UserChat.VOTE);
                             List<String> buttons = new ArrayList<>();
                             for(int i=0;i<userChats.size();i++)
