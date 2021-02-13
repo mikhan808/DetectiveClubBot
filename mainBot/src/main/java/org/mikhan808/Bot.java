@@ -9,18 +9,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class Bot extends TelegramLongPollingBot {
 
-    public Bot()
-    {
-        super();
-        userChats = new ArrayList<>();
-        rand = new Random();
-    }
+    public static final int COUNT_CARDS_ON_HANDS = 10;
 
     private int countPlayers = 1000;
     private int countVotePlayers = 0;
@@ -29,11 +22,21 @@ public class Bot extends TelegramLongPollingBot {
     private final Random rand;
     private String associate;
     private int conspiratorIndex = 0;
+    public static final int COUNT_CARD_ON_ROUND = 2;
+    private static final String WORDS_FILE_NAME = "Words.csv";
+    private final Stack<String> cards;
 
-    private static final String CHATS_FILE_NAME = "chats.csv";
+    public Bot() {
+        super();
+        userChats = new ArrayList<>();
+        rand = new Random();
+        cards = getCards();
+        Collections.shuffle(cards, rand);
+    }
+
     List<UserChat> userChats;
 
-    private static final String BEGIN_DISCUSSION="Перейти к обсуждению";
+    private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
 
     @Override
     public String getBotUsername() {
@@ -89,8 +92,13 @@ public class Bot extends TelegramLongPollingBot {
                             sendTextToAll("Начинаем!");
                             UserChat activePlayer = userChats.get(indexActivePlayer);
                             activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
-                            sendTextToAll(activePlayer.getName()+" - активный игрок");
-                            sendTextToAll("Ожидаем ассоциацию");
+                            sendTextToAll(activePlayer.getName() + " - активный игрок");
+                            for (UserChat userChat : userChats) {
+                                for (int i = 0; i < COUNT_CARDS_ON_HANDS; i++) {
+                                    userChat.addCard(cards.pop());
+                                }
+                                sendKeyBoard(userChat.getId(), "Ожидаем ассоциацию", userChat.getCards());
+                            }
                         }
                     }
                 }
@@ -124,14 +132,43 @@ public class Bot extends TelegramLongPollingBot {
                     else sendText(player.getId(),associate);
                 }
                 user.setStatus(UserChat.ACTIVE_PLAYER_X);
-                List<String>buttons=new ArrayList<>();
-                buttons.add(BEGIN_DISCUSSION);
-                sendKeyBoard(user.getId(),"Нажмите на кнопку, когда все положат по 2 карточки",buttons);
+                sendKeyBoard(user.getId(), "Отправьте первое слово", user.getCards());
 
-            }else if (user.getStatus()==UserChat.ACTIVE_PLAYER_X)
-            {
-                if(msg.getText().equals(BEGIN_DISCUSSION))
-                {
+            }else if (user.getStatus()==UserChat.ACTIVE_PLAYER_X) {
+                String card = "";
+                for (String c : user.getCards()) {
+                    if (c.equals(msg.getText()))
+                        card = c;
+                }
+                if (!card.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    user.moveCardToTable(card);
+                    for (int i = userChats.indexOf(user), g = 0; g < userChats.size(); g++) {
+                        if (userChats.get(i).getTable().size() > 0) {
+                            sb.append(userChats.get(i).getName());
+                            sb.append(" (");
+                            if (userChats.get(i).getTable().size() > 1) {
+                                sb.append(userChats.get(i).getTable().get(0)).append(", ").append(sb.append(userChats.get(i).getTable().get(1)));
+                            } else {
+                                sb.append(userChats.get(i).getTable().get(0));
+                            }
+                            sb.append(")\n");
+                        }
+                        i++;
+                        if (i >= userChats.size())
+                            i = 0;
+                    }
+                    sendTextToAll(sb.toString());
+                } else {
+                    sendText(id, "Воспользуйтесь кнопками бота для отправки слова");
+                }
+                int ind = userChats.indexOf(user);
+                ind++;
+                if (ind >= userChats.size())
+                    ind = 0;
+                user.setStatus(UserChat.OK);
+                userChats.get(ind).setStatus(UserChat.ACTIVE_PLAYER_X);
+                if (userChats.get(ind).getTable().size() >= COUNT_CARD_ON_ROUND) {
                     countVotePlayers = 0;
                     sendTextToAll("Ассоциация:");
                     sendTextToAll(associate);
@@ -144,10 +181,8 @@ public class Bot extends TelegramLongPollingBot {
                         } else {
                             userChat.setStatus(UserChat.VOTE);
                             List<String> buttons = new ArrayList<>();
-                            for(int i=0;i<userChats.size();i++)
-                            {
-                                if(i!=indexActivePlayer&& !userChats.get(i).getId().equals(userChat.getId()))
-                                {
+                            for(int i = 0; i<userChats.size(); i++) {
+                                if(i!=indexActivePlayer&& !userChats.get(i).getId().equals(userChat.getId())) {
                                     buttons.add(userChats.get(i).getName());
                                 }
 
@@ -157,6 +192,9 @@ public class Bot extends TelegramLongPollingBot {
                                     + " кто по вашему мнению является конспиратором", buttons);
                         }
                     }
+                } else {
+                    sendTextToAll(userChats.get(ind).getName() + " кладет карточку");
+                    sendKeyBoard(userChats.get(ind).getId(), "Выберите слово", userChats.get(ind).getCards());
                 }
 
             } else if (user.getStatus() == UserChat.CONSPIRATOR) {
@@ -218,10 +256,12 @@ public class Bot extends TelegramLongPollingBot {
                             indexActivePlayer = 0;
                         }
                         if(!end) {
+                            for (UserChat userChat : userChats)
+                                userChat.resetTable();
                             sendTextToAll("Следующий раунд");
                             UserChat activePlayer = userChats.get(indexActivePlayer);
                             activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
-                            sendTextToAll(activePlayer.getName()+" - активный игрок");
+                            sendTextToAll(activePlayer.getName() + " - активный игрок");
                             sendTextToAll("Ожидаем ассоциацию");
                         }
                     }
@@ -287,8 +327,8 @@ public class Bot extends TelegramLongPollingBot {
     private void addChat(String id,String name)
     {
         try {
-        FileWriter writer = new FileWriter(CHATS_FILE_NAME, true);
-        BufferedWriter bufferWriter = new BufferedWriter(writer);
+            FileWriter writer = new FileWriter(WORDS_FILE_NAME, true);
+            BufferedWriter bufferWriter = new BufferedWriter(writer);
         bufferWriter.write("\n" + id+";"+name);
         bufferWriter.close();
     } catch (IOException e) {
@@ -317,10 +357,10 @@ public class Bot extends TelegramLongPollingBot {
     }
 
 
-    List<UserChat> getTrueChats() {
-        List<UserChat> result = new ArrayList<>();
+    Stack<String> getCards() {
+        Stack<String> result = new Stack<>();
         try {
-            File file = new File(CHATS_FILE_NAME);
+            File file = new File(WORDS_FILE_NAME);
             //создаем объект FileReader для объекта File
             FileReader fr = new FileReader(file);
             //создаем BufferedReader с существующего FileReader для построчного считывания
@@ -330,8 +370,7 @@ public class Bot extends TelegramLongPollingBot {
             while (line != null) {
                 line = line.trim();
                 if (!line.isEmpty()) {
-                    String[] mas = line.split(";");
-                    //result.add(new UserChat(mas[0],mas[1]));
+                    result.push(line);
                 }
                 // считываем остальные строки в цикле
                 line = reader.readLine();
