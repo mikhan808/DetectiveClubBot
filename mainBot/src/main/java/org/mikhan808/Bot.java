@@ -143,7 +143,7 @@ public class Bot extends TelegramLongPollingBot {
                 if (!card.isEmpty()) {
                     StringBuilder sb = new StringBuilder();
                     user.moveCardToTable(card);
-                    for (int i = userChats.indexOf(user), g = 0; g < userChats.size(); g++) {
+                    for (int i = indexActivePlayer, g = 0; g < userChats.size(); g++) {
                         if (userChats.get(i).getTable().size() > 0) {
                             sb.append(userChats.get(i).getName());
                             sb.append(" (");
@@ -248,7 +248,7 @@ public class Bot extends TelegramLongPollingBot {
                         boolean end =false;
                         if (indexActivePlayer < userChats.size() - 1)
                             indexActivePlayer++;
-                        else if (countRounds == 0) {
+                        else if (countRounds == 1) {
                             sendTextToAll("Конец игры");
                             end = true;
                         } else {
@@ -256,13 +256,17 @@ public class Bot extends TelegramLongPollingBot {
                             indexActivePlayer = 0;
                         }
                         if (!end) {
-                            for (UserChat userChat : userChats)
-                                userChat.resetTable();
-                            sendTextToAll("Следующий раунд");
                             UserChat activePlayer = userChats.get(indexActivePlayer);
                             activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
-                            sendTextToAll(activePlayer.getName() + " - активный игрок");
-                            sendTextToAll("Ожидаем ассоциацию");
+                            for (UserChat userChat : userChats) {
+                                userChat.resetTable();
+                                for (int i = 0; i < COUNT_CARD_ON_ROUND; i++)
+                                    userChat.addCard(cards.pop());
+                                sendText(userChat.getId(), "Следующий раунд");
+                                sendText(userChat.getId(), activePlayer.getName() + " - активный игрок");
+                                sendKeyBoard(userChat.getId(), "Ожидаем ассоциацию", userChat.getCards());
+                            }
+
                         }
                     }
                 }
