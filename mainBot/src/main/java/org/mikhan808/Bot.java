@@ -8,7 +8,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +26,7 @@ public class Bot extends TelegramLongPollingBot {
     private int countVotePlayers = 0;
     private int indexActivePlayer = 0;
     private int countRounds = 2;
-    private Random rand;
+    private final Random rand;
     private String associate;
     private int conspiratorIndex = 0;
 
@@ -153,67 +152,57 @@ public class Bot extends TelegramLongPollingBot {
                                 }
 
                             }
-                            sendKeyBoard(userChat.getId(),"Расскажите почему Вы положили именно эти карточки,"+
+                            sendKeyBoard(userChat.getId(), "Расскажите почему Вы положили именно эти карточки," +
                                     "выслушайте других участников и проголосуйте за того,"
-                                    +" кто по вашему мнению является конспиратором",buttons);
+                                    + " кто по вашему мнению является конспиратором", buttons);
                         }
                     }
                 }
 
-            }
-            else if (user.getStatus()==UserChat.VOTE)
-            {
+            } else if (user.getStatus() == UserChat.CONSPIRATOR) {
+                sendText(id, "Ну зачем такие движения? не наводите на себя подозрения)");
+            } else if (user.getStatus() == UserChat.VOTE) {
                 UserChat voteUser = findUser(msg.getText());
-                if(voteUser==null)
-                    sendText(id,"Пожалуйста выберите игрока с помощью кнопок");
+                if (voteUser == null)
+                    sendText(id, "Пожалуйста выберите игрока с помощью кнопок");
                 else {
                     voteUser.incVotes();
-                    user.setGuessed(userChats.indexOf(voteUser)==conspiratorIndex);
+                    user.setGuessed(userChats.indexOf(voteUser) == conspiratorIndex);
                     countVotePlayers++;
-                    if(countVotePlayers<userChats.size()-1)
-                    {
+                    if (countVotePlayers < userChats.size() - 1) {
                         user.setStatus(UserChat.OK);
                         sendText(id,"Ожидайте других игроков");
-                    }
-                    else {
+                    } else {
                         user.setStatus(UserChat.OK);
                         sendText(id,"Ожидайте других игроков");
                         StringBuilder sb =new StringBuilder();
                         sb.append("Конспиратор - ").append(userChats.get(conspiratorIndex).getName()).append("\n");
                         UserChat [] usersScore = new UserChat[userChats.size()];
                         usersScore = userChats.toArray(usersScore);
-                        if(userChats.get(conspiratorIndex).getVotes()>1)
-                        {
+                        if(userChats.get(conspiratorIndex).getVotes()>1) {
                             userChats.get(conspiratorIndex).setCurrentRoundScore(0);
                             userChats.get(indexActivePlayer).setCurrentRoundScore(0);
-                        }
-                        else
-                        {
+                        } else {
                             userChats.get(conspiratorIndex).setCurrentRoundScore(5);
                             userChats.get(indexActivePlayer).setCurrentRoundScore(4);
                         }
-                        for (int i=0;i<userChats.size();i++)
-                        {
-                            if(i!=conspiratorIndex&&i!=indexActivePlayer)
-                            {
+                        for (int i=0; i<userChats.size(); i++) {
+                            if(i!=conspiratorIndex&&i!=indexActivePlayer) {
                                 if(userChats.get(i).isGuessed())
                                     userChats.get(i).setCurrentRoundScore(3);
                                 else
                                     userChats.get(i).setCurrentRoundScore(0);
                             }
                         }
-                        for(int i=0;i<usersScore.length;i++)
-                            for(int g = 0;g<usersScore.length-1;g++)
-                            {
-                                if(usersScore[g+1].getScore()>usersScore[g].getScore())
-                                {
+                        for(int i=0; i<usersScore.length; i++)
+                            for(int g = 0; g<usersScore.length-1; g++) {
+                                if(usersScore[g+1].getScore()>usersScore[g].getScore()) {
                                     UserChat temp = usersScore[g];
                                     usersScore[g]= usersScore[g+1];
                                     usersScore[g+1] = temp;
                                 }
                             }
-                        for(int i=0;i<usersScore.length;i++)
-                        {
+                        for(int i=0; i<usersScore.length; i++) {
                             sb.append(i+1).append(". ").append(usersScore[i].getName()).append(" = ").append(usersScore[i].getScore());
                             sb.append(" (").append(usersScore[i].getCurrentRoundScore()).append(")\n");
                         }
@@ -221,17 +210,14 @@ public class Bot extends TelegramLongPollingBot {
                         boolean end =false;
                         if(indexActivePlayer<userChats.size())
                             indexActivePlayer++;
-                        else if (countRounds == 0)
-                        {
+                        else if (countRounds == 0) {
                             sendTextToAll("Конец игры");
                             end =true;
-                        }
-                        else {
+                        } else {
                             countRounds--;
                             indexActivePlayer = 0;
                         }
-                        if(!end)
-                        {
+                        if(!end) {
                             sendTextToAll("Следующий раунд");
                             UserChat activePlayer = userChats.get(indexActivePlayer);
                             activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
