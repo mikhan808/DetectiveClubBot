@@ -13,6 +13,8 @@ public class UserChat {
     private int currentRoundScore = 0;
     private final List<String> cards;
     private final List<String> table;
+    public final static int ACTIVE_PLAYER_Z = 8;
+    public final static int VOTE_X = 9;
 
     public final static int ENTER_NAME = 1;
     public final static int OK = 2;
@@ -21,6 +23,8 @@ public class UserChat {
     public final static int CONSPIRATOR = 5;
     public final static int ACTIVE_PLAYER_X = 6;
     public final static int VOTE = 7;
+    private UserChat voteUser;
+    private int deductedPoints;
 
     public UserChat(Long id, String name) {
         this.id = id;
@@ -111,6 +115,23 @@ public class UserChat {
 
     public List<String> getTable() {
         return table;
+    }
+
+    public UserChat getVoteUser() {
+        return voteUser;
+    }
+
+    public void setVoteUser(UserChat voteUser) {
+        this.voteUser = voteUser;
+    }
+
+    public int getDeductedPoints() {
+        return deductedPoints;
+    }
+
+    public void setDeductedPoints(int deductedPoints) {
+        this.deductedPoints = deductedPoints;
+        score -= deductedPoints;
     }
 }
 
