@@ -142,11 +142,12 @@
                             <outputDirectory>${pom.basedir}/target</outputDirectory>
                             <resources>
                                 <resource>
-                                    <directory>${pom.basedir}</directory>
+                                    <directory>${pom.basedir}/..</directory>
                                     <filtering>true</filtering>
                                     <includes>
                                         <include>*.bat</include>
                                         <include>*.properties</include>
+                                        <include>*.csv</include>
                                     </includes>
                                 </resource>
                             </resources>
