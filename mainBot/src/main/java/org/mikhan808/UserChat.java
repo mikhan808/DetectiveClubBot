@@ -14,7 +14,7 @@ public class UserChat {
     private final List<String> cards;
     private final List<String> table;
     public final static int ACTIVE_PLAYER_Z = 8;
-    public final static int VOTE_X = 9;
+
 
     public final static int ENTER_NAME = 1;
     public final static int OK = 2;
@@ -23,6 +23,13 @@ public class UserChat {
     public final static int CONSPIRATOR = 5;
     public final static int ACTIVE_PLAYER_X = 6;
     public final static int VOTE = 7;
+    public final static int VOTE_X = 9;
+    public final static int ENTER_TYPE_GAME = 10;
+    public final static int JOIN_GAME = 11;
+    public final static int ENTER_COUNT_ROUNDS = 12;
+    public final static int ENTER_COUNT_CARDS = 13;
+    private Game game;
+
     private UserChat voteUser;
     private int deductedPoints;
 
@@ -132,6 +139,14 @@ public class UserChat {
     public void setDeductedPoints(int deductedPoints) {
         this.deductedPoints = deductedPoints;
         score -= deductedPoints;
+    }
+
+    public Game getGame() {
+        return game;
+    }
+
+    public void setGame(Game game) {
+        this.game = game;
     }
 }
 
