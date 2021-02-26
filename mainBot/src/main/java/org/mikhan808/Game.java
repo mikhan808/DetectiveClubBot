@@ -208,6 +208,9 @@ public class Game {
         if (getConspirator().getVotes() > 1) {
             getConspirator().setCurrentRoundScore(0);
             getActivePlayer().setCurrentRoundScore(0);
+        } else if (getConspirator().getVotes() == 1) {
+            getConspirator().setCurrentRoundScore(conspirator_score - 1);
+            getActivePlayer().setCurrentRoundScore(active_player_score - 1);
         } else {
             getConspirator().setCurrentRoundScore(conspirator_score);
             getActivePlayer().setCurrentRoundScore(active_player_score);
@@ -446,6 +449,7 @@ public class Game {
         sendTextToAll("Начинаем!");
         for (UserChat userChat : userChats) {
             userChat.getCards().clear();
+            userChat.setScore(0);
             for (int i = 0; i < count_cards_on_hands - count_card_on_round; i++) {
                 userChat.addCard(getNextCard());
             }
