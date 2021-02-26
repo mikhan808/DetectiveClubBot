@@ -268,8 +268,10 @@ public class Game {
     private void checkVote(Message msg, UserChat user) {
         UserChat voteUser = findUserOfCard(msg.getText());
         if (voteUser == null)
-            bot.sendText(user.getId(), "Пожалуйста проголосуйте с помощью кнопок");
-        else {
+            bot.sendKeyBoard(user.getId(), "Пожалуйста проголосуйте с помощью кнопок", table);
+        else if (voteUser == user) {
+            bot.sendKeyBoard(user.getId(), "За себя голосовать нельзя", table);
+        } else {
             user.setVoteUser(voteUser);
             requestConfirmation(user, UserChat.VOTE_X);
         }
@@ -294,7 +296,7 @@ public class Game {
         for (UserChat player : userChats) {
             bot.forwardMessage(player.getId(), associate);
             player.setStatus(UserChat.ACTIVE_PLAYER_X);
-            bot.sendKeyBoard(player.getId(), "Отправьте подходящую карточку", user.getCards());
+            bot.sendKeyBoard(player.getId(), "Отправьте подходящую карточку", player.getCards());
         }
 
     }
@@ -396,12 +398,11 @@ public class Game {
             userChat.setGuessed(false);
             if (userChat == getActivePlayer()) {
                 userChat.setStatus(UserChat.OK);
-                bot.sendText(userChat.getId(), "Ждите результата голосования");
+                bot.sendKeyBoard(userChat.getId(), "Ждите результата голосования", table);
             } else {
                 userChat.setStatus(UserChat.VOTE);
-                bot.sendKeyBoard(userChat.getId(), "Расскажите почему Вы положили именно эти карточки," +
-                        "выслушайте других участников и проголосуйте за того,"
-                        + " кто по вашему мнению является конспиратором", table);
+                bot.sendKeyBoard(userChat.getId(), "проголосуйте за карточку,"
+                        + " которая по вашему мнению является карточкой рассказчика", table);
             }
         }
     }
