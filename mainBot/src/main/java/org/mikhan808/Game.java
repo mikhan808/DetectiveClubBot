@@ -13,22 +13,15 @@ import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
 public class Game {
-    public static final int STANDARD_SCORING = 0;
-    public static final int USER_SCORING = 1;
-
     public static final int MIN_COUNT_PLAYERS = 4;
-    public static final int FULL_ONLINE = 0;
-    public static final int WITHOUT_CARDS = 1;
-    private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
     private static final String WORDS_FILE_NAME = "Words.csv";
-    private final int count_card_on_round = 2;
-    private final int conspirator_score = 3;
+    private final int count_card_on_round = 1;
+    private final int all_guessed_score = 2;
     private final int active_player_score = 3;
     private final int guessed_score = 3;
-    private final int deducted_score = 1;
+    private final int adding_score = 1;
     private final Random rand;
     private final List<UserChat> userChats;
-    private final int type_scoring = USER_SCORING;
     private final Bot bot;
     private final List<String> yesno;
     int enterNames = 0;
@@ -41,9 +34,7 @@ public class Game {
     private int indexActivePlayer = 0;
     private int countRounds = 2;
     private Message associate;
-    private int conspiratorIndex = 0;
-    private String card;
-    private int type_game = FULL_ONLINE;
+    private final List<String> table;
 
     public Game(Bot bot) {
         this.bot = bot;
@@ -54,6 +45,7 @@ public class Game {
         yesno = new ArrayList<>();
         yesno.add(YES);
         yesno.add(NO);
+        table = new ArrayList<>();
     }
 
     private UserChat findUser(Long id) {
@@ -73,6 +65,15 @@ public class Game {
         return null;
     }
 
+    private UserChat findUserOfCard(String card) {
+
+        for (UserChat user : userChats) {
+            if (card.trim().equalsIgnoreCase(user.getCardOnTable()))
+                return user;
+        }
+        return null;
+    }
+
     public void readMsg(Update update) {
         Message msg = update.getMessage();
         Long id = msg.getChatId();
@@ -86,8 +87,6 @@ public class Game {
                 enterName(msg, user);
             } else if (user.getStatus() == UserChat.ENTER_COUNT_PLAYERS) {
                 enterCountPlayers(msg, user);
-            } else if (user.getStatus() == UserChat.ENTER_TYPE_GAME) {
-                enterTypeGame(msg, user);
             } else if (user.getStatus() == UserChat.ENTER_COUNT_ROUNDS) {
                 enterCountRounds(msg, user);
             } else if (user.getStatus() == UserChat.ENTER_COUNT_CARDS) {
@@ -95,47 +94,24 @@ public class Game {
             } else if (user.getStatus() == UserChat.OK) {
                 bot.sendText(id, "Ожидаем, потерпите)");
             } else if (user.getStatus() == UserChat.ACTIVE_PLAYER) {
-                boolean error = false;
-                if (msg.hasText()) {
-                    if (msg.getText().toLowerCase().contains("вы конспиратор")) {
-                        bot.sendText(id, "ассоциация не должна содержать слово 'конспиратор'");
-                        error = true;
-                    }
-                    for (String c : user.getCards())
-                        if (c.equalsIgnoreCase(msg.getText())) {
-                            bot.sendText(id, "ассоциация не должна быть из ваших карточек");
-                            error = true;
-                        }
-
-                }
-                if (!error)
                     sendAssociate(msg, user);
             } else if (user.getStatus() == UserChat.ACTIVE_PLAYER_X) {
-                if (type_game == FULL_ONLINE)
                     checkCard(msg, user);
-                else requestConfirmation(user, UserChat.ACTIVE_PLAYER_Z);
             } else if (user.getStatus() == UserChat.CONSPIRATOR) {
                 bot.sendText(id, "Ну зачем такие движения? не наводите на себя подозрения)");
             } else if (user.getStatus() == UserChat.VOTE) {
                 checkVote(msg, user);
             } else if (user.getStatus() == UserChat.ACTIVE_PLAYER_Z) {
                 if (msg.getText().equals(YES)) {
-                    if (type_game == FULL_ONLINE)
                         sendCard(user);
-                    else runVote();
                 } else {
-                    if (type_game == FULL_ONLINE) {
                         user.setStatus(UserChat.ACTIVE_PLAYER_X);
                         bot.sendKeyBoard(user.getId(), "Выберите карточку", user.getCards());
-                    } else {
-                        sendButtonBeginDiscussion(user);
-                    }
                 }
             } else if (user.getStatus() == UserChat.VOTE_X) {
                 if (msg.getText().equals(YES)) {
-                    if (userChats.indexOf(user) != conspiratorIndex)
-                        user.getVoteUser().incVotes();
-                    user.setGuessed(userChats.indexOf(user.getVoteUser()) == conspiratorIndex);
+                    user.getVoteUser().incVotes();
+                    user.setGuessed(user.getVoteUser() == getActivePlayer());
                     countVotePlayers++;
                     if (countVotePlayers < userChats.size() - 1) {
                         user.setStatus(UserChat.OK);
@@ -162,7 +138,7 @@ public class Game {
                     }
                 } else {
                     user.setStatus(UserChat.VOTE);
-                    bot.sendKeyBoard(id, "Проголосуйте еще раз", calculateButtonsForVote(user));
+                    bot.sendKeyBoard(id, "Проголосуйте еще раз", table);
                 }
 
             }
@@ -205,36 +181,37 @@ public class Game {
     }
 
     private void calculateScores() {
-        if (getConspirator().getVotes() > 1) {
-            getConspirator().setCurrentRoundScore(0);
-            getActivePlayer().setCurrentRoundScore(0);
-        } else if (getConspirator().getVotes() == 1) {
-            getConspirator().setCurrentRoundScore(conspirator_score - 1);
-            getActivePlayer().setCurrentRoundScore(active_player_score - 1);
-        } else {
-            getConspirator().setCurrentRoundScore(conspirator_score);
+        boolean all_guessed = false;
+        if (getActivePlayer().getVotes() > 0 && getActivePlayer().getVotes() < userChats.size() - 1) {
             getActivePlayer().setCurrentRoundScore(active_player_score);
+        } else if (getActivePlayer().getVotes() == userChats.size() - 1) {
+            getActivePlayer().setCurrentRoundScore(0);
+            all_guessed = true;
+        } else {
+            getActivePlayer().setCurrentRoundScore(0);
         }
         for (int i = 0; i < userChats.size(); i++) {
-            if (i != conspiratorIndex && i != indexActivePlayer) {
-                if (userChats.get(i).isGuessed())
-                    userChats.get(i).setCurrentRoundScore(guessed_score);
-                else
+            if (i != indexActivePlayer) {
+                if (userChats.get(i).isGuessed()) {
+                    if (all_guessed)
+                        userChats.get(i).setCurrentRoundScore(all_guessed_score);
+                    else userChats.get(i).setCurrentRoundScore(guessed_score);
+                } else
                     userChats.get(i).setCurrentRoundScore(0);
-                userChats.get(i).setDeductedPoints(userChats.get(i).getVotes() * deducted_score);
+                userChats.get(i).setAddingScore(userChats.get(i).getVotes() * adding_score);
             } else {
-                userChats.get(i).setDeductedPoints(0);
+                userChats.get(i).setAddingScore(0);
             }
         }
     }
 
     private String buildListUsersScore() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Конспиратор - ").append(getConspirator().getName()).append("\n");
+        sb.append("Карта рассказчика - ").append(getActivePlayer().getCardOnTable()).append("\n");
         UserChat[] usersScore = sortedUsers();
         for (int i = 0; i < usersScore.length; i++) {
             sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" = ").append(usersScore[i].getScore());
-            sb.append(" (").append(usersScore[i].getCurrentRoundScore()).append(" -").append(usersScore[i].getDeductedPoints()).append(")\n");
+            sb.append(" (").append(usersScore[i].getCurrentRoundScore()).append(" +").append(usersScore[i].getAddingScore()).append(")\n");
         }
         return sb.toString();
     }
@@ -256,8 +233,8 @@ public class Game {
     private void nextRound() {
         UserChat activePlayer = getActivePlayer();
         activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
+        table.clear();
         for (UserChat userChat : userChats) {
-            userChat.resetTable();
             for (int i = 0; i < count_card_on_round; i++)
                 userChat.addCard(getNextCard());
             bot.sendText(userChat.getId(), "Следующий раунд");
@@ -280,43 +257,18 @@ public class Game {
     }
 
     private void sendCard(UserChat user) {
-        StringBuilder sb = new StringBuilder();
-        user.moveCardToTable(card);
-        for (int i = indexActivePlayer, g = 0; g < userChats.size(); g++) {
-            if (userChats.get(i).getTable().size() > 0) {
-                sb.append(userChats.get(i).getName());
-                sb.append(" (");
-                for (int x = 0; x < userChats.get(i).getTable().size(); x++) {
-                    if (x != 0)
-                        sb.append(", ");
-                    sb.append(userChats.get(i).getTable().get(x));
-                }
-                sb.append(")\n");
-            }
-            i++;
-            if (i >= userChats.size())
-                i = 0;
-        }
-        bot.sendKeyBoard(user.getId(), "Ок", user.getCards());
-        sendTextToAll(sb.toString());
-        int ind = userChats.indexOf(user);
-        ind++;
-        if (ind >= userChats.size())
-            ind = 0;
+        user.moveCardToTable(user.getCardOnTable());
+        table.add(user.getCardOnTable());
         user.setStatus(UserChat.OK);
-        userChats.get(ind).setStatus(UserChat.ACTIVE_PLAYER_X);
-        if (userChats.get(ind).getTable().size() >= count_card_on_round) {
+        bot.sendKeyBoard(user.getId(), "Ок, ожидаем других игроков", user.getCards());
+        if (table.size() == userChats.size())
             runVote();
-        } else {
-            sendTextToAll(userChats.get(ind).getName() + " кладет карточку");
-            bot.sendKeyBoard(userChats.get(ind).getId(), "Выберите слово", userChats.get(ind).getCards());
-        }
     }
 
     private void checkVote(Message msg, UserChat user) {
-        UserChat voteUser = findUser(msg.getText());
+        UserChat voteUser = findUserOfCard(msg.getText());
         if (voteUser == null)
-            bot.sendText(user.getId(), "Пожалуйста выберите игрока с помощью кнопок");
+            bot.sendText(user.getId(), "Пожалуйста проголосуйте с помощью кнопок");
         else {
             user.setVoteUser(voteUser);
             requestConfirmation(user, UserChat.VOTE_X);
@@ -324,12 +276,13 @@ public class Game {
     }
 
     private void checkCard(Message msg, UserChat user) {
-        card = "";
+        String card = "";
         for (String c : user.getCards()) {
             if (c.equals(msg.getText()))
                 card = c;
         }
         if (!card.isEmpty()) {
+            user.setCardOnTable(card);
             requestConfirmation(user, UserChat.ACTIVE_PLAYER_Z);
         } else {
             bot.sendText(user.getId(), "Воспользуйтесь кнопками бота для отправки слова");
@@ -338,29 +291,14 @@ public class Game {
 
     private void sendAssociate(Message msg, UserChat user) {
         associate = msg;
-        conspiratorIndex = rand.nextInt(userChats.size());
-        while (conspiratorIndex == indexActivePlayer)
-            conspiratorIndex = rand.nextInt(userChats.size());
-        getConspirator().setStatus(UserChat.CONSPIRATOR);
         for (UserChat player : userChats) {
-            if (player.getStatus() == UserChat.CONSPIRATOR)
-                bot.sendText(player.getId(), "Вы конспиратор");
-            else bot.forwardMessage(player.getId(), associate);
+            bot.forwardMessage(player.getId(), associate);
+            player.setStatus(UserChat.ACTIVE_PLAYER_X);
+            bot.sendKeyBoard(player.getId(), "Отправьте подходящую карточку", user.getCards());
         }
-        if (type_game == FULL_ONLINE) {
-            user.setStatus(UserChat.ACTIVE_PLAYER_X);
-            bot.sendKeyBoard(user.getId(), "Отправьте первое слово", user.getCards());
-        } else {
-            sendButtonBeginDiscussion(user);
-        }
+
     }
 
-    private void sendButtonBeginDiscussion(UserChat user) {
-        user.setStatus(UserChat.ACTIVE_PLAYER_X);
-        List<String> buttons = new ArrayList<>();
-        buttons.add(BEGIN_DISCUSSION);
-        bot.sendKeyBoard(user.getId(), "Нажмите на кнопку, когда все положат по 2 карточки", buttons);
-    }
 
     private void enterCountPlayers(Message msg, UserChat user) {
 
@@ -369,8 +307,8 @@ public class Game {
                 int x = Integer.parseInt(msg.getText().trim());
                 if (x >= MIN_COUNT_PLAYERS) {
                     countPlayers = x;
-                    user.setStatus(UserChat.ENTER_TYPE_GAME);
-                    bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
+                    user.setStatus(UserChat.ENTER_COUNT_ROUNDS);
+                    bot.sendText(user.getId(), "Введите количество раундов");
                 } else {
                     bot.sendText(user.getId(), "Количество игроков не может быть меньше " + MIN_COUNT_PLAYERS);
                 }
@@ -380,20 +318,6 @@ public class Game {
             }
     }
 
-    private void enterTypeGame(Message msg, UserChat user) {
-
-        if (msg.getText() != null)
-            try {
-                if (msg.getText().equals(YES))
-                    type_game = FULL_ONLINE;
-                else type_game = WITHOUT_CARDS;
-                user.setStatus(UserChat.ENTER_COUNT_ROUNDS);
-                bot.sendText(user.getId(), "Введите количество раундов");
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
-    }
 
     private void enterCountRounds(Message msg, UserChat user) {
 
@@ -459,40 +383,25 @@ public class Game {
 
     }
 
-    private UserChat getConspirator() {
-        return userChats.get(conspiratorIndex);
-    }
-
     private UserChat getActivePlayer() {
         return userChats.get(indexActivePlayer);
     }
 
-    private List<String> calculateButtonsForVote(UserChat user) {
-        List<String> buttons = new ArrayList<>();
-        for (int i = 0; i < userChats.size(); i++) {
-            if (i != indexActivePlayer && !userChats.get(i).getId().equals(user.getId())) {
-                buttons.add(userChats.get(i).getName());
-            }
-
-        }
-        return buttons;
-    }
 
     private void runVote() {
         countVotePlayers = 0;
-        sendTextToAll("Ассоциация:");
-        forwardMsgToAll(associate);
+        Collections.shuffle(table, rand);
         for (UserChat userChat : userChats) {
             userChat.resetVotes();
             userChat.setGuessed(false);
-            if (userChat.getStatus() == UserChat.ACTIVE_PLAYER_X) {
+            if (userChat == getActivePlayer()) {
                 userChat.setStatus(UserChat.OK);
-                bot.sendText(userChat.getId(), "Объясните почему Вы положили именно эти карточки и ждите результата голосования");
+                bot.sendText(userChat.getId(), "Ждите результата голосования");
             } else {
                 userChat.setStatus(UserChat.VOTE);
                 bot.sendKeyBoard(userChat.getId(), "Расскажите почему Вы положили именно эти карточки," +
                         "выслушайте других участников и проголосуйте за того,"
-                        + " кто по вашему мнению является конспиратором", calculateButtonsForVote(userChat));
+                        + " кто по вашему мнению является конспиратором", table);
             }
         }
     }

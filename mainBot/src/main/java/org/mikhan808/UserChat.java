@@ -12,7 +12,7 @@ public class UserChat {
     private boolean guessed;
     private int currentRoundScore = 0;
     private final List<String> cards;
-    private final List<String> table;
+    private String cardOnTable;
     public final static int ACTIVE_PLAYER_Z = 8;
 
 
@@ -31,14 +31,13 @@ public class UserChat {
     private Game game;
 
     private UserChat voteUser;
-    private int deductedPoints;
+    private int addingScore;
 
     public UserChat(Long id, String name) {
         this.id = id;
         this.name = name;
         score = 0;
         cards = new ArrayList<>();
-        table = new ArrayList<>();
     }
 
     public Long getId() {
@@ -113,15 +112,7 @@ public class UserChat {
 
     public void moveCardToTable(String card) {
         cards.remove(card);
-        table.add(card);
-    }
-
-    public void resetTable() {
-        table.clear();
-    }
-
-    public List<String> getTable() {
-        return table;
+        cardOnTable = card;
     }
 
     public UserChat getVoteUser() {
@@ -132,13 +123,13 @@ public class UserChat {
         this.voteUser = voteUser;
     }
 
-    public int getDeductedPoints() {
-        return deductedPoints;
+    public int getAddingScore() {
+        return addingScore;
     }
 
-    public void setDeductedPoints(int deductedPoints) {
-        this.deductedPoints = deductedPoints;
-        score -= deductedPoints;
+    public void setAddingScore(int addingScore) {
+        this.addingScore = addingScore;
+        score += addingScore;
     }
 
     public Game getGame() {
@@ -147,6 +138,14 @@ public class UserChat {
 
     public void setGame(Game game) {
         this.game = game;
+    }
+
+    public String getCardOnTable() {
+        return cardOnTable;
+    }
+
+    public void setCardOnTable(String cardOnTable) {
+        this.cardOnTable = cardOnTable;
     }
 }
 
