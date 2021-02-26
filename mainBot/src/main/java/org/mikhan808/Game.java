@@ -363,9 +363,14 @@ public class Game {
 
         if (msg.getText() != null)
             try {
-                countPlayers = Integer.parseInt(msg.getText().trim());
-                user.setStatus(UserChat.ENTER_TYPE_GAME);
-                bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
+                int x = Integer.parseInt(msg.getText().trim());
+                if (x >= MIN_COUNT_PLAYERS) {
+                    countPlayers = x;
+                    user.setStatus(UserChat.ENTER_TYPE_GAME);
+                    bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
+                } else {
+                    bot.sendText(user.getId(), "Количество игроков не может быть меньше " + MIN_COUNT_PLAYERS);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");

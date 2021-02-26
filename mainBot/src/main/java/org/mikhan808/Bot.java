@@ -89,9 +89,17 @@ public class Bot extends TelegramLongPollingBot {
             if (user != null) {
                 if (user.getGame() == null) {
                     if (user.getStatus() == UserChat.JOIN_GAME) {
-                        Game game = findGame(Integer.parseInt(msg.getText().trim()));
-                        if (game == null || !game.addPlayer(user)) {
-                            sendKeyBoard(id, "Попробуйте еще раз", createOrJoinButtons);
+                        try {
+                            int x = Integer.parseInt(msg.getText().trim());
+                            Game game = findGame(x);
+                            if (game == null || !game.addPlayer(user)) {
+                                user.setStatus(UserChat.OK);
+                                sendKeyBoard(id, "Попробуйте еще раз", createOrJoinButtons);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            user.setStatus(UserChat.OK);
+                            sendKeyBoard(user.getId(), "Номер игры должен быть числом. Попробуйте заново", createOrJoinButtons);
                         }
                     } else {
                         if (msg.getText().equals(CREATE_GAME)) {
