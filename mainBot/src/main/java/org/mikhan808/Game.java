@@ -210,7 +210,7 @@ public class Game {
         sb.append("Карта рассказчика - ").append(getActivePlayer().getCardOnTable()).append("\n");
         UserChat[] usersScore = sortedUsers();
         for (int i = 0; i < usersScore.length; i++) {
-            sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" = ").append(usersScore[i].getScore());
+            sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" '").append(usersScore[i].getCardOnTable()).append("' = ").append(usersScore[i].getScore());
             sb.append(" (").append(usersScore[i].getCurrentRoundScore()).append(" +").append(usersScore[i].getAddingScore()).append(")\n");
         }
         return sb.toString();
