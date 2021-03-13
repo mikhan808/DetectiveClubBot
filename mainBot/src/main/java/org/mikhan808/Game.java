@@ -13,22 +13,10 @@ import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
 public class Game {
-    public static final int STANDARD_SCORING = 0;
-    public static final int USER_SCORING = 1;
-
     public static final int MIN_COUNT_PLAYERS = 4;
-    public static final int FULL_ONLINE = 0;
-    public static final int WITHOUT_CARDS = 1;
-    private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
     private static final String WORDS_FILE_NAME = "Words.csv";
-    private final int count_card_on_round = 2;
-    private final int conspirator_score = 3;
-    private final int active_player_score = 3;
-    private final int guessed_score = 3;
-    private final int deducted_score = 1;
     private final Random rand;
     private final List<UserChat> userChats;
-    private final int type_scoring = USER_SCORING;
     private final Bot bot;
     private final List<String> yesno;
     int enterNames = 0;
@@ -36,14 +24,12 @@ public class Game {
     private int id;
     private Stack<String> cards;
     private int countPlayers = 1000;
-    private int count_cards_on_hands = 12;
+    private int count_cards_on_hands = 4;
     private int countVotePlayers = 0;
     private int indexActivePlayer = 0;
     private int countRounds = 2;
     private Message associate;
-    private int conspiratorIndex = 0;
-    private String card;
-    private int type_game = FULL_ONLINE;
+    private List<Team> teams;
 
     public Game(Bot bot) {
         this.bot = bot;
