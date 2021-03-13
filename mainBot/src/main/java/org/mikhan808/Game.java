@@ -84,6 +84,7 @@ public class Game {
                 if (userChats.size() >= MIN_COUNT_PLAYERS) {
                     sendTextToAll(user.getName() + " покинул игру");
                     countPlayers--;
+                    nextRound();
                 } else {
                     sendTextToAll(user.getName() + " завершил игру");
                     finishGame();
@@ -238,15 +239,17 @@ public class Game {
 
     private void nextRound() {
         UserChat activePlayer = getActivePlayer();
-        activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
         table.clear();
         for (UserChat userChat : userChats) {
-            for (int i = 0; i < count_card_on_round; i++)
+            for (int i = 0; i < count_card_on_round; i++) {
                 userChat.addCard(getNextCard());
+                userChat.setStatus(UserChat.OK);
+            }
             bot.sendText(userChat.getId(), "Следующий раунд");
             bot.sendText(userChat.getId(), activePlayer.getName() + " - активный игрок");
             bot.sendKeyBoard(userChat.getId(), "Ожидаем ассоциацию", userChat.getCards());
         }
+        activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
     }
 
     private void requestConfirmation(UserChat user, int status) {
