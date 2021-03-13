@@ -24,10 +24,11 @@ public class UserChat {
     public final static int ACTIVE_PLAYER_X = 6;
     public final static int VOTE = 7;
     public final static int VOTE_X = 9;
-    public final static int ENTER_TYPE_GAME = 10;
+    public final static int ENTER_COUNT_TEAMS = 10;
     public final static int JOIN_GAME = 11;
     public final static int ENTER_COUNT_ROUNDS = 12;
     public final static int ENTER_COUNT_CARDS = 13;
+    public final static int ENTER_NAME_TEAM = 14;
     private Game game;
 
     private UserChat voteUser;

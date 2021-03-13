@@ -14,6 +14,7 @@ import static org.mikhan808.Bot.YES;
 
 public class Game {
     public static final int MIN_COUNT_PLAYERS = 4;
+    public static final int MIN_COUNT_TEAMS = 2;
     private static final String WORDS_FILE_NAME = "Words.csv";
     private final Random rand;
     private final List<UserChat> userChats;
@@ -24,16 +25,18 @@ public class Game {
     private int id;
     private Stack<String> cards;
     private int countPlayers = 1000;
+    private final List<Team> teams;
     private int count_cards_on_hands = 4;
     private int countVotePlayers = 0;
-    private int indexActivePlayer = 0;
+    private int countTeams = 2;
     private int countRounds = 2;
     private Message associate;
-    private List<Team> teams;
+    private int indexActiveTeam = 0;
 
     public Game(Bot bot) {
         this.bot = bot;
         userChats = new ArrayList<>();
+        teams = new ArrayList<>();
         rand = new Random();
         cards = getCards();
         Collections.shuffle(cards, rand);
@@ -72,8 +75,8 @@ public class Game {
                 enterName(msg, user);
             } else if (user.getStatus() == UserChat.ENTER_COUNT_PLAYERS) {
                 enterCountPlayers(msg, user);
-            } else if (user.getStatus() == UserChat.ENTER_TYPE_GAME) {
-                enterTypeGame(msg, user);
+            } else if (user.getStatus() == UserChat.ENTER_COUNT_TEAMS) {
+                enterCountTeams(msg, user);
             } else if (user.getStatus() == UserChat.ENTER_COUNT_ROUNDS) {
                 enterCountRounds(msg, user);
             } else if (user.getStatus() == UserChat.ENTER_COUNT_CARDS) {
@@ -133,14 +136,14 @@ public class Game {
                         String usersScore = buildListUsersScore();
                         sendTextToAll(usersScore);
                         boolean end = false;
-                        if (indexActivePlayer < userChats.size() - 1)
-                            indexActivePlayer++;
+                        if (indexActiveTeam < userChats.size() - 1)
+                            indexActiveTeam++;
                         else if (countRounds == 1) {
                             finishGame();
                             end = true;
                         } else {
                             countRounds--;
-                            indexActivePlayer = 0;
+                            indexActiveTeam = 0;
                         }
                         if (!end) {
                             nextRound();
@@ -202,7 +205,7 @@ public class Game {
             getActivePlayer().setCurrentRoundScore(active_player_score);
         }
         for (int i = 0; i < userChats.size(); i++) {
-            if (i != conspiratorIndex && i != indexActivePlayer) {
+            if (i != conspiratorIndex && i != indexActiveTeam) {
                 if (userChats.get(i).isGuessed())
                     userChats.get(i).setCurrentRoundScore(guessed_score);
                 else
@@ -216,7 +219,7 @@ public class Game {
 
     private String buildListUsersScore() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Конспиратор - ").append(getConspirator().getName()).append("\n");
+        sb.append("Конспиратор - ");
         UserChat[] usersScore = sortedUsers();
         for (int i = 0; i < usersScore.length; i++) {
             sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" = ").append(usersScore[i].getScore());
@@ -268,7 +271,7 @@ public class Game {
     private void sendCard(UserChat user) {
         StringBuilder sb = new StringBuilder();
         user.moveCardToTable(card);
-        for (int i = indexActivePlayer, g = 0; g < userChats.size(); g++) {
+        for (int i = indexActiveTeam, g = 0; g < userChats.size(); g++) {
             if (userChats.get(i).getTable().size() > 0) {
                 sb.append(userChats.get(i).getName());
                 sb.append(" (");
@@ -325,7 +328,7 @@ public class Game {
     private void sendAssociate(Message msg, UserChat user) {
         associate = msg;
         conspiratorIndex = rand.nextInt(userChats.size());
-        while (conspiratorIndex == indexActivePlayer)
+        while (conspiratorIndex == indexActiveTeam)
             conspiratorIndex = rand.nextInt(userChats.size());
         getConspirator().setStatus(UserChat.CONSPIRATOR);
         for (UserChat player : userChats) {
@@ -355,8 +358,8 @@ public class Game {
                 int x = Integer.parseInt(msg.getText().trim());
                 if (x >= MIN_COUNT_PLAYERS) {
                     countPlayers = x;
-                    user.setStatus(UserChat.ENTER_TYPE_GAME);
-                    bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
+                    user.setStatus(UserChat.ENTER_COUNT_TEAMS);
+                    bot.sendText(user.getId(), "Введите количество команд.(В каждой команде должно быть не менее 2 человек)");
                 } else {
                     bot.sendText(user.getId(), "Количество игроков не может быть меньше " + MIN_COUNT_PLAYERS);
                 }
@@ -366,15 +369,18 @@ public class Game {
             }
     }
 
-    private void enterTypeGame(Message msg, UserChat user) {
+    private void enterCountTeams(Message msg, UserChat user) {
 
         if (msg.getText() != null)
             try {
-                if (msg.getText().equals(YES))
-                    type_game = FULL_ONLINE;
-                else type_game = WITHOUT_CARDS;
-                user.setStatus(UserChat.ENTER_COUNT_ROUNDS);
-                bot.sendText(user.getId(), "Введите количество раундов");
+                int x = Integer.parseInt(msg.getText().trim());
+                if (x >= MIN_COUNT_TEAMS && countPlayers / x >= 2) {
+                    countTeams = x;
+                    user.setStatus(UserChat.ENTER_COUNT_ROUNDS);
+                    bot.sendText(user.getId(), "Введите количество раундов.");
+                } else {
+                    bot.sendText(user.getId(), "Количество команд не может быть меньше " + MIN_COUNT_TEAMS);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
@@ -445,18 +451,18 @@ public class Game {
 
     }
 
-    private UserChat getConspirator() {
-        return userChats.get(conspiratorIndex);
+    private Team getActiveTeam() {
+        return teams.get(indexActiveTeam);
     }
 
     private UserChat getActivePlayer() {
-        return userChats.get(indexActivePlayer);
+        return getActiveTeam().getActivePlayer();
     }
 
     private List<String> calculateButtonsForVote(UserChat user) {
         List<String> buttons = new ArrayList<>();
         for (int i = 0; i < userChats.size(); i++) {
-            if (i != indexActivePlayer && !userChats.get(i).getId().equals(user.getId())) {
+            if (i != indexActiveTeam && !userChats.get(i).getId().equals(user.getId())) {
                 buttons.add(userChats.get(i).getName());
             }
 
