@@ -79,8 +79,14 @@ public class Game {
         UserChat user = findUser(id);
         if (user != null) {
             if (msg.hasText() && msg.getText().equals("/exit")) {
-                sendTextToAll(user.getName() + " завершил игру");
-                finishGame();
+                userChats.remove(user);
+                if (userChats.size() >= MIN_COUNT_PLAYERS) {
+                    sendTextToAll(user.getName() + " покинул игру");
+                    countPlayers--;
+                } else {
+                    sendTextToAll(user.getName() + " завершил игру");
+                    finishGame();
+                }
             }
             if (user.getStatus() == UserChat.ENTER_NAME) {
                 enterName(msg, user);
