@@ -107,7 +107,6 @@ public class Bot extends TelegramLongPollingBot {
                             games.add(game);
                             user.setGame(game);
                             game.setId(randIDForGame());
-                            sendText(id, "№ игры = " + game.getId());
                             if (!game.addPlayer(user))
                                 sendKeyBoard(id, "Попробуйте еще раз", createOrJoinButtons);
                         } else if (msg.getText().equals(JOIN_GAME)) {
