@@ -122,10 +122,10 @@ public class Game {
                     countVotePlayers++;
                     if (countVotePlayers < userChats.size() - 1) {
                         user.setStatus(UserChat.OK);
-                        bot.sendText(id, "Ожидайте других игроков");
+                        bot.sendKeyBoard(id, "Ожидайте других игроков", user.getCards());
                     } else {
                         user.setStatus(UserChat.OK);
-                        bot.sendText(id, "Ожидайте других игроков");
+                        bot.sendKeyBoard(id, "Ожидайте других игроков", user.getCards());
                         calculateScores();
                         String usersScore = buildListUsersScore();
                         sendTextToAll(usersScore);
