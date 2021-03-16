@@ -476,6 +476,9 @@ public class Game {
                     finishGame();
                 else {
                     getActiveTeam().incIndexActivePlayer();
+                    for (String key : getActiveTeam().getAssociates().keySet()) {
+                        getActiveTeam().getAssociates().get(key).add(getActiveTeam().getCurrentAssociates().get(key));
+                    }
                     indexActiveTeam++;
                     if (indexActiveTeam >= teams.size())
                         indexActiveTeam = 0;
