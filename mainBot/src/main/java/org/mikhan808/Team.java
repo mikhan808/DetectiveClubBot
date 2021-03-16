@@ -1,26 +1,32 @@
 package org.mikhan808;
 
+import org.telegram.telegrambots.meta.api.objects.Message;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Team {
     List<UserChat> userChats;
     int winCards = 0;
     int loseCards = 0;
     private String name;
-    private final int indexActivePlayer = 0;
-    private final int[] code;
-    private final int size_code;
-    private final Bot bot;
-    private List<String> cards;
-    private int size_cards = 4;
+    private final List<String> cards;
+    private final Map<String, List<Message>> associates;
+    private final Map<String, Message> currentAssociates;
+    private final List<String> resultVotes;
+    private final List<String> votes;
+    private int indexActivePlayer = 0;
 
-    public Team(int size_cards, Bot bot) {
-        this.bot = bot;
-        this.size_cards = size_cards;
-        size_code = size_cards - 1;
-        code = new int[size_code];
+
+    public Team() {
         userChats = new ArrayList<>();
+        cards = new ArrayList<>();
+        associates = new HashMap<>();
+        currentAssociates = new HashMap<>();
+        votes = new ArrayList<>();
+        resultVotes = new ArrayList<>();
     }
 
     public String getName() {
@@ -37,15 +43,74 @@ public class Team {
 
     public void addPlayer(UserChat user) {
         userChats.add(user);
-        if (userChats.indexOf(user) == 0) {
-            while (user.getStatus() != UserChat.OK) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+        user.setTeam(this);
+    }
+
+    public void addCard(String card) {
+        cards.add(card);
+        associates.put(card, new ArrayList<>());
+    }
+
+    public List<String> getCards() {
+        return cards;
+    }
+
+    public String getCardsToString() {
+        String x = "";
+        for (int i = 0; i < cards.size(); i++) {
+            x += (i + 1) + " = " + cards.get(i) + "\n";
+        }
+        return x;
+    }
+
+    public Map<String, List<Message>> getAssociates() {
+        return associates;
+    }
+
+    public Map<String, Message> getCurrentAssociates() {
+        return currentAssociates;
+    }
+
+    public void resetVotes() {
+        votes.clear();
+        resultVotes.clear();
+        for (int i = 1; i <= cards.size(); i++)
+            votes.add("" + i);
+    }
+
+    public List<String> getVotes() {
+        return votes;
+    }
+
+    public boolean removeVote(String vote) {
+        for (int i = 0; i < votes.size(); i++) {
+            if (votes.get(i).equals(vote)) {
+                resultVotes.add(votes.get(i));
+                votes.remove(i);
+                return true;
             }
         }
+        return false;
+    }
+
+    public List<String> getResultVotes() {
+        return resultVotes;
+    }
+
+    public String getResultVotesToString() {
+        String x = "";
+        for (int i = 0; i < resultVotes.size(); i++) {
+            if (i != 0)
+                x += ", ";
+            x += resultVotes.get(i);
+        }
+        return x;
+    }
+
+    public void incIndexActivePlayer() {
+        indexActivePlayer++;
+        if (indexActivePlayer >= userChats.size())
+            indexActivePlayer = 0;
     }
 
 }

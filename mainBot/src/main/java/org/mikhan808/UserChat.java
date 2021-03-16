@@ -1,18 +1,13 @@
 package org.mikhan808;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class UserChat {
     private Long id;
     private String name;
-    private int score;
     private int status;
-    private int votes;
     private boolean guessed;
-    private int currentRoundScore = 0;
-    private final List<String> cards;
-    private final List<String> table;
+    public final static int DISCUSSION = 5;
     public final static int ACTIVE_PLAYER_Z = 8;
 
 
@@ -20,7 +15,7 @@ public class UserChat {
     public final static int OK = 2;
     public final static int ACTIVE_PLAYER = 3;
     public final static int ENTER_COUNT_PLAYERS = 4;
-    public final static int CONSPIRATOR = 5;
+    int indexCode = 0;
     public final static int ACTIVE_PLAYER_X = 6;
     public final static int VOTE = 7;
     public final static int VOTE_X = 9;
@@ -30,16 +25,11 @@ public class UserChat {
     public final static int ENTER_COUNT_CARDS = 13;
     public final static int ENTER_NAME_TEAM = 14;
     private Game game;
-
-    private UserChat voteUser;
-    private int deductedPoints;
+    private Team team;
 
     public UserChat(Long id, String name) {
         this.id = id;
         this.name = name;
-        score = 0;
-        cards = new ArrayList<>();
-        table = new ArrayList<>();
     }
 
     public Long getId() {
@@ -58,33 +48,12 @@ public class UserChat {
         this.name = name;
     }
 
-    public int getScore() {
-        return score;
-    }
-
-    public void setScore(int score) {
-        this.score = score;
-    }
-
     public int getStatus() {
         return status;
     }
 
     public void setStatus(int status) {
         this.status = status;
-    }
-
-    public int getVotes() {
-        return votes;
-    }
-
-    public void resetVotes()
-    {
-        votes = 0;
-    }
-
-    public void incVotes(){
-        votes++;
     }
 
     public boolean isGuessed() {
@@ -95,51 +64,8 @@ public class UserChat {
         this.guessed = guessed;
     }
 
-    public int getCurrentRoundScore() {
-        return currentRoundScore;
-    }
-
-    public void setCurrentRoundScore(int currentRoundScore) {
-        this.currentRoundScore = currentRoundScore;
-        score += currentRoundScore;
-    }
-
     public List<String> getCards() {
-        return cards;
-    }
-
-    public void addCard(String card) {
-        cards.add(card);
-    }
-
-    public void moveCardToTable(String card) {
-        cards.remove(card);
-        table.add(card);
-    }
-
-    public void resetTable() {
-        table.clear();
-    }
-
-    public List<String> getTable() {
-        return table;
-    }
-
-    public UserChat getVoteUser() {
-        return voteUser;
-    }
-
-    public void setVoteUser(UserChat voteUser) {
-        this.voteUser = voteUser;
-    }
-
-    public int getDeductedPoints() {
-        return deductedPoints;
-    }
-
-    public void setDeductedPoints(int deductedPoints) {
-        this.deductedPoints = deductedPoints;
-        score -= deductedPoints;
+        return team.getCards();
     }
 
     public Game getGame() {
@@ -148,6 +74,14 @@ public class UserChat {
 
     public void setGame(Game game) {
         this.game = game;
+    }
+
+    public Team getTeam() {
+        return team;
+    }
+
+    public void setTeam(Team team) {
+        this.team = team;
     }
 }
 
