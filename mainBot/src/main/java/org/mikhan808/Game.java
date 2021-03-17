@@ -102,8 +102,8 @@ public class Game {
                 if (msg.hasText() && msg.getText().equals("/ready")) {
                     runVote(user);
                 } else {
-                    sendTeamExcludeActivePlayer(user.getTeam(), "[" + user.getName() + "]");
-                    sendTeamExcludeActivePlayer(user.getTeam(), msg);
+                    sendTeamExcludeActivePlayerAndUser(user.getTeam(), "[" + user.getName() + "]", user);
+                    sendTeamExcludeActivePlayerAndUser(user.getTeam(), msg, user);
                 }
             }
 
@@ -122,6 +122,12 @@ public class Game {
     }
 
     private void finishGame() {
+        StringBuilder sb = new StringBuilder();
+        for (Team team : teams) {
+            sb.append(team.getName()).append("\n");
+            sb.append(team.getCardsToString());
+        }
+        sendTextToAll(sb.toString());
         sendTextToAll("Конец игры");
         for (UserChat user : userChats) {
             user.setGame(null);
@@ -205,6 +211,20 @@ public class Game {
         }
     }
 
+    private void sendTeamExcludeActivePlayerAndUser(Team team, Message msg, UserChat userChat) {
+        for (UserChat user : team.userChats) {
+            if (user != getActivePlayer() && user != userChat)
+                bot.forwardMessage(user.getId(), msg);
+        }
+    }
+
+    private void sendTeamExcludeActivePlayerAndUser(Team team, String text, UserChat userChat) {
+        for (UserChat user : team.userChats) {
+            if (user != getActivePlayer() && user != userChat)
+                bot.sendText(user.getId(), text);
+        }
+    }
+
     private void requestAssociate() {
         indexCode++;
         bot.sendText(getActivePlayer().getId(), "Отправьте ассоциацию на карточку '" + getActiveTeam().getCards().get(code[indexCode]) + "'");
@@ -277,8 +297,9 @@ public class Game {
                 "Для удобства мы вам высылаем ассоциации, которые были в предыдущих раундах");
         for (int i = 0; i < getActiveTeam().getCards().size(); i++) {
             sendTextToAll("Карточка №" + (i + 1));
-            for (Message msg : getActiveTeam().getAssociates().get(getActiveTeam().getCards().get(i))) {
-                forwardMsgToAll(msg);
+            List<Message> msgs = getActiveTeam().getAssociates().get(getActiveTeam().getCards().get(i));
+            for (int g = 0; g < msgs.size(); g++) {
+                forwardMsgToAll(msgs.get(g));
             }
         }
         sendTextToAll("Текущие ассоциации от активного игрока");
@@ -477,7 +498,9 @@ public class Game {
                 else {
                     getActiveTeam().incIndexActivePlayer();
                     for (String key : getActiveTeam().getAssociates().keySet()) {
-                        getActiveTeam().getAssociates().get(key).add(getActiveTeam().getCurrentAssociates().get(key));
+                        Message msg = getActiveTeam().getCurrentAssociates().get(key);
+                        if (msg != null)
+                            getActiveTeam().getAssociates().get(key).add(msg);
                     }
                     indexActiveTeam++;
                     if (indexActiveTeam >= teams.size())
