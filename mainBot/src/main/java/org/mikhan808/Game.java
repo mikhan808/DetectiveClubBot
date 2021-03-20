@@ -82,6 +82,7 @@ public class Game {
             if (msg.hasText() && msg.getText().equals("/exit")) {
                 userChats.remove(user);
                 if (userChats.size() >= MIN_COUNT_PLAYERS) {
+                    user.setGame(null);
                     sendTextToAll(user.getName() + " покинул игру");
                     countPlayers--;
                     nextRound();
@@ -152,6 +153,7 @@ public class Game {
 
         } else {
             bot.sendText(id, "Почему то вас нет в списках попробуйте присоединиться к другой игре");
+            user.setGame(null);
         }
     }
 
