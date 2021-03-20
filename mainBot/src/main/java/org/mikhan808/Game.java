@@ -175,6 +175,7 @@ public class Game {
 
         } else {
             bot.sendText(id, "Почему то вас нет в списках попробуйте присоединиться к другой игре");
+            user.setGame(null);
         }
     }
 
