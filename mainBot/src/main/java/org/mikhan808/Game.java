@@ -29,7 +29,6 @@ public class Game {
     private int count_cards_on_hands = 4;
     private int countVotePlayers = 0;
     private int countTeams = 2;
-    private int countRounds = 2;
     private int indexActiveTeam = 0;
     private int[] code;
 
@@ -273,10 +272,14 @@ public class Game {
 
 
     private void checkVote(Message msg, UserChat user) {
-        if (!user.getTeam().removeVote(msg.getText()))
-            bot.sendText(user.getId(), "Пожалуйста выберите цифру с помощью кнопок");
-        else {
-            requestVote(user);
+        if (countPlayers >= teams.size()) {
+            showResult();
+        } else {
+            if (!user.getTeam().removeVote(msg.getText()))
+                bot.sendText(user.getId(), "Пожалуйста выберите цифру с помощью кнопок");
+            else {
+                requestVote(user);
+            }
         }
     }
 
@@ -349,19 +352,6 @@ public class Game {
             }
     }
 
-    private void enterCountRounds(Message msg, UserChat user) {
-
-        if (msg.getText() != null)
-            try {
-                countRounds = Integer.parseInt(msg.getText());
-                user.setStatus(UserChat.ENTER_COUNT_CARDS);
-                bot.sendText(user.getId(), "Введите количество карточек на руках");
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
-    }
-
     private void enterCountCards(Message msg, UserChat user) {
 
         if (msg.getText() != null)
@@ -390,7 +380,7 @@ public class Game {
                 if (teams.size() < countTeams && userChats.indexOf(user) >= teams.size()) {
                     createTeam(user);
                 } else {
-                    int ind = userChats.indexOf(user) % teams.size();
+                    int ind = userChats.indexOf(user) % countTeams;
                     teams.get(ind).addPlayer(user);
                     user.setStatus(UserChat.OK);
                     checkFinishSettingsForBeginGame(user);
@@ -461,53 +451,58 @@ public class Game {
             bot.forwardMessage(user.getId(), getActiveTeam().getCurrentAssociates().get(card));
         } else {
             countVotePlayers++;
-            if (countVotePlayers == teams.size()) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("Код = ").append(codeToString()).append("\n");
-                for (Team team : teams) {
+            if (countVotePlayers >= teams.size())
+                showResult();
 
-                    boolean guessed = true;
-                    for (int i = 0; i < team.getResultVotes().size(); i++) {
-                        if (code[i] + 1 != Integer.parseInt(team.getResultVotes().get(i))) {
-                            guessed = false;
-                            break;
-                        }
-                    }
-                    if (guessed && team != getActiveTeam())
-                        team.winCards++;
-                    else if (!guessed && team == getActiveTeam())
-                        team.loseCards++;
-                    sb.append(team.getName()).append(" = ").append(team.getResultVotesToString());
-                    sb.append("(+").append(team.winCards).append(", -").append(team.loseCards).append(")\n");
-                }
+        }
+    }
 
-                sendTextToAll(sb.toString());
-                boolean end = false;
-                for (Team team : teams) {
-                    if (team.winCards == WIN_CARDS) {
-                        end = true;
-                        sendTextToAll(team.getName() + " выиграли");
-                    }
-                    if (team.loseCards == WIN_CARDS) {
-                        end = true;
-                        sendTextToAll(team.getName() + " проиграли");
-                    }
-                }
-                if (end)
-                    finishGame();
-                else {
-                    getActiveTeam().incIndexActivePlayer();
-                    for (String key : getActiveTeam().getAssociates().keySet()) {
-                        Message msg = getActiveTeam().getCurrentAssociates().get(key);
-                        if (msg != null)
-                            getActiveTeam().getAssociates().get(key).add(msg);
-                    }
-                    indexActiveTeam++;
-                    if (indexActiveTeam >= teams.size())
-                        indexActiveTeam = 0;
-                    nextRound();
+    private void showResult() {
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Код = ").append(codeToString()).append("\n");
+        for (Team team : teams) {
+
+            boolean guessed = true;
+            for (int i = 0; i < team.getResultVotes().size(); i++) {
+                if (code[i] + 1 != Integer.parseInt(team.getResultVotes().get(i))) {
+                    guessed = false;
+                    break;
                 }
             }
+            if (guessed && team != getActiveTeam())
+                team.winCards++;
+            else if (!guessed && team == getActiveTeam())
+                team.loseCards++;
+            sb.append(team.getName()).append(" = ").append(team.getResultVotesToString());
+            sb.append("(+").append(team.winCards).append(", -").append(team.loseCards).append(")\n");
+        }
+
+        sendTextToAll(sb.toString());
+        boolean end = false;
+        for (Team team : teams) {
+            if (team.winCards == WIN_CARDS) {
+                end = true;
+                sendTextToAll(team.getName() + " выиграли");
+            }
+            if (team.loseCards == WIN_CARDS) {
+                end = true;
+                sendTextToAll(team.getName() + " проиграли");
+            }
+        }
+        if (end)
+            finishGame();
+        else {
+            getActiveTeam().incIndexActivePlayer();
+            for (String key : getActiveTeam().getAssociates().keySet()) {
+                Message msg = getActiveTeam().getCurrentAssociates().get(key);
+                if (msg != null)
+                    getActiveTeam().getAssociates().get(key).add(msg);
+            }
+            indexActiveTeam++;
+            if (indexActiveTeam >= teams.size())
+                indexActiveTeam = 0;
+            nextRound();
         }
     }
 
