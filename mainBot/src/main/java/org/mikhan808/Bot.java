@@ -47,16 +47,15 @@ public class Bot extends TelegramLongPollingBot {
         return BotConfig.TOKEN;
     }
 
-    private UserChat findUser(Long id)
-    {
-        for (UserChat user:userChats)
-        {
-            if(user.getId().equals(id))
+    public UserChat findUser(Long id) {
+        for (UserChat user : userChats) {
+            if (user.getId().equals(id))
                 return user;
         }
         return null;
     }
-    private UserChat findUser(String name) {
+
+    public UserChat findUser(String name) {
 
         for (UserChat user : userChats) {
             if (name.trim().equalsIgnoreCase(user.getName()))

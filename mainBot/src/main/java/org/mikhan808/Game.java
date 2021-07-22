@@ -13,7 +13,6 @@ import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
 public class Game {
-    public static final int STANDARD_SCORING = 0;
     public static final int USER_SCORING = 1;
 
     public static final int MIN_COUNT_PLAYERS = 4;
@@ -80,6 +79,7 @@ public class Game {
         if (user != null) {
             if (msg.hasText() && msg.getText().equals("/exit")) {
                 userChats.remove(user);
+                user.setGame(null);
                 if (userChats.size() >= MIN_COUNT_PLAYERS) {
                     sendTextToAll(user.getName() + " покинул игру");
                     countPlayers--;
@@ -175,7 +175,8 @@ public class Game {
 
         } else {
             bot.sendText(id, "Почему то вас нет в списках попробуйте присоединиться к другой игре");
-            user.setGame(null);
+            bot.findUser(id).setGame(null);
+            //user.setGame(null);
         }
     }
 
