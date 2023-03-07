@@ -3,10 +3,7 @@ package org.mikhan808;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.*;
 
 import static org.mikhan808.Bot.NO;
@@ -14,7 +11,7 @@ import static org.mikhan808.Bot.YES;
 
 public class Game {
     public static final int MIN_COUNT_PLAYERS = 4;
-    private static final String WORDS_FILE_NAME = "Words.csv";
+    private static final String PATH_TO_IMAGES = "D:\\Dixit\\images";
     private final int count_card_on_round = 1;
     private final int all_guessed_score = 2;
     private final int active_player_score = 3;
@@ -27,14 +24,14 @@ public class Game {
     int enterNames = 0;
     boolean finishSetting = false;
     private int id;
-    private Stack<String> cards;
+    private final List<File> table;
     private int countPlayers = 1000;
     private int count_cards_on_hands = 12;
     private int countVotePlayers = 0;
     private int indexActivePlayer = 0;
     private int countRounds = 2;
     private Message associate;
-    private final List<String> table;
+    private Stack<File> cards;
 
     public Game(Bot bot) {
         this.bot = bot;
@@ -65,10 +62,10 @@ public class Game {
         return null;
     }
 
-    private UserChat findUserOfCard(String card) {
+    private UserChat findUserOfCard(File card) {
 
         for (UserChat user : userChats) {
-            if (card.trim().equalsIgnoreCase(user.getCardOnTable()))
+            if (card == user.getCardOnTable())
                 return user;
         }
         return null;
@@ -113,8 +110,8 @@ public class Game {
                 if (msg.getText().equals(YES)) {
                         sendCard(user);
                 } else {
-                        user.setStatus(UserChat.ACTIVE_PLAYER_X);
-                        bot.sendKeyBoard(user.getId(), "Выберите карточку", user.getCards());
+                    user.setStatus(UserChat.ACTIVE_PLAYER_X);
+                    sendCards(user.getCards(), user.getId(), "Выберите карточку", true);
                 }
             } else if (user.getStatus() == UserChat.VOTE_X) {
                 if (msg.getText().equals(YES)) {
@@ -123,10 +120,10 @@ public class Game {
                     countVotePlayers++;
                     if (countVotePlayers < userChats.size() - 1) {
                         user.setStatus(UserChat.OK);
-                        bot.sendKeyBoard(id, "Ожидайте других игроков", user.getCards());
+                        sendCards(user.getCards(), id, "Ожидайте других игроков", false);
                     } else {
                         user.setStatus(UserChat.OK);
-                        bot.sendKeyBoard(id, "Ожидайте других игроков", user.getCards());
+                        sendCards(user.getCards(), id, "Ожидайте других игроков", false);
                         calculateScores();
                         String usersScore = buildListUsersScore();
                         sendTextToAll(usersScore);
@@ -146,15 +143,26 @@ public class Game {
                     }
                 } else {
                     user.setStatus(UserChat.VOTE);
-                    bot.sendKeyBoard(id, "Проголосуйте еще раз", table);
+                    sendCards(table, id, "Проголосуйте еще раз", false);
                 }
 
             }
 
         } else {
             bot.sendText(id, "Почему то вас нет в списках попробуйте присоединиться к другой игре");
-            user.setGame(null);
+            bot.findUser(id).setGame(null);
         }
+    }
+
+    private void sendCards(List<File> cards, Long userId, String text, boolean sendPhotos) {
+        List<String> list = new ArrayList<>();
+        for (int i = 0; i < cards.size(); i++) {
+            String s = "Карточка №" + (i + 1);
+            list.add(s);
+            if (sendPhotos)
+                bot.sendPhoto(userId, cards.get(i), s);
+        }
+        bot.sendKeyBoard(userId, text, list);
     }
 
     private void finishGame() {
@@ -216,10 +224,10 @@ public class Game {
 
     private String buildListUsersScore() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Карта рассказчика - ").append(getActivePlayer().getCardOnTable()).append("\n");
+        sb.append("Карта рассказчика - №").append(table.indexOf(getActivePlayer().getCardOnTable()) + 1).append("\n");
         UserChat[] usersScore = sortedUsers();
         for (int i = 0; i < usersScore.length; i++) {
-            sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" '").append(usersScore[i].getCardOnTable()).append("' = ").append(usersScore[i].getScore());
+            sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" №").append(table.indexOf(usersScore[i].getCardOnTable()) + 1).append(" = ").append(usersScore[i].getScore());
             sb.append(" (").append(usersScore[i].getCurrentRoundScore()).append(" +").append(usersScore[i].getAddingScore()).append(")\n");
         }
         return sb.toString();
@@ -249,7 +257,7 @@ public class Game {
             }
             bot.sendText(userChat.getId(), "Следующий раунд");
             bot.sendText(userChat.getId(), activePlayer.getName() + " - активный игрок");
-            bot.sendKeyBoard(userChat.getId(), "Ожидаем ассоциацию", userChat.getCards());
+            sendCards(userChat.getCards(), userChat.getId(), "Ожидаем ассоциацию", true);
         }
         activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
     }
@@ -259,7 +267,7 @@ public class Game {
         bot.sendKeyBoard(user.getId(), "Вы уверены?", yesno);
     }
 
-    private String getNextCard() {
+    private File getNextCard() {
         if (cards.empty()) {
             cards = getCards();
             Collections.shuffle(cards, rand);
@@ -271,17 +279,30 @@ public class Game {
         user.moveCardToTable(user.getCardOnTable());
         table.add(user.getCardOnTable());
         user.setStatus(UserChat.OK);
-        bot.sendKeyBoard(user.getId(), "Ок, ожидаем других игроков", user.getCards());
+        sendCards(user.getCards(), user.getId(), "Ок, ожидаем других игроков", false);
         if (table.size() == userChats.size())
             runVote();
     }
 
+    private File getCardFromMessage(Message msg, Long id, List<File> cards) {
+        try {
+            int ind = Integer.parseInt(msg.getText().replaceFirst("Карточка №", "")) - 1;
+            return cards.get(ind);
+        } catch (NumberFormatException e) {
+            sendCards(cards, id, "Пожалуйста воспользуйтесь кнопками", false);
+            return null;
+        }
+    }
+
     private void checkVote(Message msg, UserChat user) {
-        UserChat voteUser = findUserOfCard(msg.getText());
+        File card = getCardFromMessage(msg, user.getId(), table);
+        if (card == null)
+            return;
+        UserChat voteUser = findUserOfCard(card);
         if (voteUser == null)
-            bot.sendKeyBoard(user.getId(), "Пожалуйста проголосуйте с помощью кнопок", table);
+            sendCards(table, user.getId(), "Пожалуйста проголосуйте с помощью кнопок", false);
         else if (voteUser == user) {
-            bot.sendKeyBoard(user.getId(), "За себя голосовать нельзя", table);
+            sendCards(table, user.getId(), "За себя голосовать нельзя", false);
         } else {
             user.setVoteUser(voteUser);
             requestConfirmation(user, UserChat.VOTE_X);
@@ -289,17 +310,11 @@ public class Game {
     }
 
     private void checkCard(Message msg, UserChat user) {
-        String card = "";
-        for (String c : user.getCards()) {
-            if (c.equals(msg.getText()))
-                card = c;
-        }
-        if (!card.isEmpty()) {
-            user.setCardOnTable(card);
-            requestConfirmation(user, UserChat.ACTIVE_PLAYER_Z);
-        } else {
-            bot.sendText(user.getId(), "Воспользуйтесь кнопками бота для отправки слова");
-        }
+        File card = getCardFromMessage(msg, user.getId(), user.getCards());
+        if (card == null)
+            return;
+        user.setCardOnTable(card);
+        requestConfirmation(user, UserChat.ACTIVE_PLAYER_Z);
     }
 
     private void sendAssociate(Message msg, UserChat user) {
@@ -307,7 +322,7 @@ public class Game {
         for (UserChat player : userChats) {
             bot.forwardMessage(player.getId(), associate);
             player.setStatus(UserChat.ACTIVE_PLAYER_X);
-            bot.sendKeyBoard(player.getId(), "Отправьте подходящую карточку", player.getCards());
+            sendCards(player.getCards(), player.getId(), "Отправьте подходящую карточку", false);
         }
 
     }
@@ -409,34 +424,28 @@ public class Game {
             userChat.setGuessed(false);
             if (userChat == getActivePlayer()) {
                 userChat.setStatus(UserChat.OK);
-                bot.sendKeyBoard(userChat.getId(), "Ждите результата голосования", table);
+                sendCards(table, userChat.getId(), "Ждите результата голосования", true);
             } else {
                 userChat.setStatus(UserChat.VOTE);
-                bot.sendKeyBoard(userChat.getId(), "проголосуйте за карточку,"
-                        + " которая по вашему мнению является карточкой рассказчика", table);
+                sendCards(table, userChat.getId(), "проголосуйте за карточку,"
+                        + " которая по вашему мнению является карточкой рассказчика", true);
             }
         }
     }
 
-    Stack<String> getCards() {
-        Stack<String> result = new Stack<>();
+    Stack<File> getCards() {
+        Stack<File> result = new Stack<>();
         try {
-            File file = new File(WORDS_FILE_NAME);
+            File folder = new File(PATH_TO_IMAGES);
             //создаем объект FileReader для объекта File
-            FileReader fr = new FileReader(file);
+
             //создаем BufferedReader с существующего FileReader для построчного считывания
-            BufferedReader reader = new BufferedReader(fr);
+            File[] photos = folder.listFiles();
             // считаем сначала первую строку
-            String line = reader.readLine();
-            while (line != null) {
-                line = line.trim();
-                if (!line.isEmpty()) {
-                    result.push(line);
-                }
-                // считываем остальные строки в цикле
-                line = reader.readLine();
-            }
-        } catch (IOException e) {
+            for (File file : photos)
+                result.push(file);
+
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return result;

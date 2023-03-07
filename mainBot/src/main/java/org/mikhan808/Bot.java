@@ -3,12 +3,15 @@ package org.mikhan808;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.CopyMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -47,15 +50,14 @@ public class Bot extends TelegramLongPollingBot {
         return BotConfig.TOKEN;
     }
 
-    private UserChat findUser(Long id)
-    {
-        for (UserChat user:userChats)
-        {
-            if(user.getId().equals(id))
+    public UserChat findUser(Long id) {
+        for (UserChat user : userChats) {
+            if (user.getId().equals(id))
                 return user;
         }
         return null;
     }
+
     private UserChat findUser(String name) {
 
         for (UserChat user : userChats) {
@@ -152,6 +154,23 @@ public class Bot extends TelegramLongPollingBot {
         SendMessage s = new SendMessage();
         s.setChatId(chatId.toString()); // Боту может писать не один человек, и поэтому чтобы отправить сообщение, грубо говоря нужно узнать куда его отправлять
         s.setText(text);
+        try { //Чтобы не крашнулась программа при вылете Exception
+            execute(s);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void sendPhoto(Long chatId, File file) {
+        sendPhoto(chatId, file, null);
+    }
+
+    public void sendPhoto(Long chatId, File file, String text) {
+        SendPhoto s = new SendPhoto();
+        s.setChatId(chatId.toString());
+        s.setPhoto(new InputFile().setMedia(file));
+        if (text != null)
+            s.setCaption(text);
         try { //Чтобы не крашнулась программа при вылете Exception
             execute(s);
         } catch (TelegramApiException e) {

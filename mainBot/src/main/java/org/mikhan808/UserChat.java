@@ -1,5 +1,6 @@
 package org.mikhan808;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,8 +12,8 @@ public class UserChat {
     private int votes;
     private boolean guessed;
     private int currentRoundScore = 0;
-    private final List<String> cards;
-    private String cardOnTable;
+    private final List<File> cards;
+    private File cardOnTable;
     public final static int ACTIVE_PLAYER_Z = 8;
 
 
@@ -102,15 +103,15 @@ public class UserChat {
         score += currentRoundScore;
     }
 
-    public List<String> getCards() {
+    public List<File> getCards() {
         return cards;
     }
 
-    public void addCard(String card) {
+    public void addCard(File card) {
         cards.add(card);
     }
 
-    public void moveCardToTable(String card) {
+    public void moveCardToTable(File card) {
         cards.remove(card);
         cardOnTable = card;
     }
@@ -140,11 +141,11 @@ public class UserChat {
         this.game = game;
     }
 
-    public String getCardOnTable() {
+    public File getCardOnTable() {
         return cardOnTable;
     }
 
-    public void setCardOnTable(String cardOnTable) {
+    public void setCardOnTable(File cardOnTable) {
         this.cardOnTable = cardOnTable;
     }
 }
