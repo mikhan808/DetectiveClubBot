@@ -3,70 +3,67 @@ package org.mikhan808;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.*;
 
 import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
+/**
+ * The Resistance game logic adapted for this bot.
+ */
 public class Game {
-    public static final int USER_SCORING = 1;
 
-    public static final int MIN_COUNT_PLAYERS = 4;
-    public static final int FULL_ONLINE = 0;
-    public static final int WITHOUT_CARDS = 1;
-    private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
-    private static final String WORDS_FILE_NAME = "Words.csv";
-    private final int count_card_on_round = 2;
-    private final int conspirator_score = 3;
-    private final int active_player_score = 3;
-    private final int guessed_score = 3;
-    private final int deducted_score = 1;
-    private final Random rand;
-    private final List<UserChat> userChats;
-    private final int type_scoring = USER_SCORING;
+    // UI strings
+    private static final String START_GAME = "Начать игру";
+    private static final String DONE = "Готово";
+    private static final String RESET = "Сброс";
+    private static final String ADD_PREFIX = "Добавить: ";
+    private static final String REMOVE_PREFIX = "Убрать: ";
+    private static final String MISSION_SUCCESS = "Успех";
+    private static final String MISSION_FAIL = "Провал";
+
     private final Bot bot;
-    private final List<String> yesno;
-    int enterNames = 0;
-    boolean finishSetting = false;
+    private final List<UserChat> players;
+    private final Random rand;
+
     private int id;
-    private Stack<String> cards;
-    private int countPlayers = 1000;
-    private int count_cards_on_hands = 12;
-    private int countVotePlayers = 0;
-    private int indexActivePlayer = 0;
-    private int countRounds = 2;
-    private Message associate;
-    private int conspiratorIndex = 0;
-    private String card;
-    private int type_game = FULL_ONLINE;
+    private boolean started = false;
+
+    private int leaderIndex = 0;
+    private int missionNumber = 1; // 1..5
+    private int rejectsInRow = 0;
+    private int successes = 0;
+    private int failures = 0;
+
+    private final List<UserChat> proposedTeam = new ArrayList<>();
+    private final Map<Long, Boolean> teamVotes = new HashMap<>(); // approve=true
+    private final Map<Long, Boolean> missionVotes = new HashMap<>(); // success=true
 
     public Game(Bot bot) {
         this.bot = bot;
-        userChats = new ArrayList<>();
-        rand = new Random();
-        cards = getCards();
-        Collections.shuffle(cards, rand);
-        yesno = new ArrayList<>();
-        yesno.add(YES);
-        yesno.add(NO);
+        this.players = new ArrayList<>();
+        this.rand = new Random();
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 
     private UserChat findUser(Long id) {
-        for (UserChat user : userChats) {
+        for (UserChat user : players) {
             if (user.getId().equals(id))
                 return user;
         }
         return null;
     }
 
-    private UserChat findUser(String name) {
-
-        for (UserChat user : userChats) {
-            if (name.trim().equalsIgnoreCase(user.getName()))
+    private UserChat findUserByName(String name) {
+        for (UserChat user : players) {
+            if (user.getName() != null && user.getName().equalsIgnoreCase(name))
                 return user;
         }
         return null;
@@ -76,464 +73,417 @@ public class Game {
         Message msg = update.getMessage();
         Long id = msg.getChatId();
         UserChat user = findUser(id);
-        if (user != null) {
-            if (msg.hasText() && msg.getText().equals("/exit")) {
-                userChats.remove(user);
-                user.setGame(null);
-                if (userChats.size() >= MIN_COUNT_PLAYERS) {
-                    sendTextToAll(user.getName() + " покинул игру");
-                    countPlayers--;
-                } else {
-                    sendTextToAll(user.getName() + " завершил игру");
-                    finishGame();
-                }
-            }
-            if (user.getStatus() == UserChat.ENTER_NAME) {
-                enterName(msg, user);
-            } else if (user.getStatus() == UserChat.ENTER_COUNT_PLAYERS) {
-                enterCountPlayers(msg, user);
-            } else if (user.getStatus() == UserChat.ENTER_TYPE_GAME) {
-                enterTypeGame(msg, user);
-            } else if (user.getStatus() == UserChat.ENTER_COUNT_ROUNDS) {
-                enterCountRounds(msg, user);
-            } else if (user.getStatus() == UserChat.ENTER_COUNT_CARDS) {
-                enterCountCards(msg, user);
-            } else if (user.getStatus() == UserChat.OK) {
-                bot.sendText(id, "Ожидаем, потерпите)");
-            } else if (user.getStatus() == UserChat.ACTIVE_PLAYER) {
-                boolean error = false;
-                if (msg.hasText()) {
-                    if (msg.getText().toLowerCase().contains("вы конспиратор")) {
-                        bot.sendText(id, "ассоциация не должна содержать слово 'конспиратор'");
-                        error = true;
-                    }
-                    for (String c : user.getCards())
-                        if (c.equalsIgnoreCase(msg.getText())) {
-                            bot.sendText(id, "ассоциация не должна быть из ваших карточек");
-                            error = true;
-                        }
-
-                }
-                if (!error)
-                    sendAssociate(msg, user);
-            } else if (user.getStatus() == UserChat.ACTIVE_PLAYER_X) {
-                if (type_game == FULL_ONLINE)
-                    checkCard(msg, user);
-                else requestConfirmation(user, UserChat.ACTIVE_PLAYER_Z);
-            } else if (user.getStatus() == UserChat.CONSPIRATOR) {
-                bot.sendText(id, "Ну зачем такие движения? не наводите на себя подозрения)");
-            } else if (user.getStatus() == UserChat.VOTE) {
-                checkVote(msg, user);
-            } else if (user.getStatus() == UserChat.ACTIVE_PLAYER_Z) {
-                if (msg.getText().equals(YES)) {
-                    if (type_game == FULL_ONLINE)
-                        sendCard(user);
-                    else runVote();
-                } else {
-                    if (type_game == FULL_ONLINE) {
-                        user.setStatus(UserChat.ACTIVE_PLAYER_X);
-                        bot.sendKeyBoard(user.getId(), "Выберите карточку", user.getCards());
-                    } else {
-                        sendButtonBeginDiscussion(user);
-                    }
-                }
-            } else if (user.getStatus() == UserChat.VOTE_X) {
-                if (msg.getText().equals(YES)) {
-                    if (userChats.indexOf(user) != conspiratorIndex)
-                        user.getVoteUser().incVotes();
-                    user.setGuessed(userChats.indexOf(user.getVoteUser()) == conspiratorIndex);
-                    countVotePlayers++;
-                    if (countVotePlayers < userChats.size() - 1) {
-                        user.setStatus(UserChat.OK);
-                        bot.sendText(id, "Ожидайте других игроков");
-                    } else {
-                        user.setStatus(UserChat.OK);
-                        bot.sendText(id, "Ожидайте других игроков");
-                        calculateScores();
-                        String usersScore = buildListUsersScore();
-                        sendTextToAll(usersScore);
-                        boolean end = false;
-                        if (indexActivePlayer < userChats.size() - 1)
-                            indexActivePlayer++;
-                        else if (countRounds == 1) {
-                            finishGame();
-                            end = true;
-                        } else {
-                            countRounds--;
-                            indexActivePlayer = 0;
-                        }
-                        if (!end) {
-                            nextRound();
-                        }
-                    }
-                } else {
-                    user.setStatus(UserChat.VOTE);
-                    bot.sendKeyBoard(id, "Проголосуйте еще раз", calculateButtonsForVote(user));
-                }
-
-            }
-
-        } else {
-            bot.sendText(id, "Почему то вас нет в списках попробуйте присоединиться к другой игре");
-            bot.findUser(id).setGame(null);
-            //user.setGame(null);
+        if (user == null) {
+            bot.sendText(id, "Вы не в игре. Присоединитесь через главное меню.");
+            if (bot.findUser(id) != null) bot.findUser(id).setGame(null);
+            return;
         }
-    }
 
-    private void finishGame() {
-        sendTextToAll("Конец игры");
-        for (UserChat user : userChats) {
+        // Allow exit at any time
+        if (msg.hasText() && "/exit".equalsIgnoreCase(msg.getText().trim())) {
+            players.remove(user);
             user.setGame(null);
+            if (!started) {
+                sendTextToAll(user.getName() + " вышел из лобби.");
+            } else {
+                sendTextToAll(user.getName() + " покинул игру.");
+                if (players.size() < 5) {
+                    finishGame("Недостаточно игроков — игра завершена.");
+                    return;
+                }
+                if (leaderIndex >= players.size()) leaderIndex = 0;
+            }
+            return;
         }
-        bot.removeGame(this);
+
+        switch (user.getStatus()) {
+            case UserChat.ENTER_NAME:
+                enterName(msg, user);
+                break;
+            case UserChat.OK:
+                handleOk(msg, user);
+                break;
+            case UserChat.TEAM_SELECTION:
+                if (isLeader(user))
+                    handleTeamSelection(msg, user);
+                else
+                    bot.sendText(id, "Ожидайте выбора лидера.");
+                break;
+            case UserChat.TEAM_VOTE:
+                handleTeamVote(msg, user);
+                break;
+            case UserChat.MISSION_VOTE:
+                handleMissionVote(msg, user);
+                break;
+            default:
+                bot.sendText(id, "Ожидайте.");
+        }
     }
 
     public boolean addPlayer(UserChat user) {
-        if (userChats.size() < countPlayers) {
-            user.setStatus(UserChat.ENTER_NAME);
-            user.setGame(this);
-            bot.sendText(user.getId(), "Добро пожаловать");
-            bot.sendText(user.getId(), "Пожалуйста введите свое имя");
-            userChats.add(user);
-            return true;
-        } else bot.sendText(user.getId(), "Количество игроков уже собрано попробуйте присоединиться к другой игре");
-        return false;
-    }
-
-    private void sendTextToAll(String text) {
-        for (UserChat user : userChats) {
-            bot.sendText(user.getId(), text);
+        if (started) {
+            bot.sendText(user.getId(), "Игра уже идёт. Дождитесь новой.");
+            return false;
         }
-    }
-
-    private void forwardMsgToAll(Message message) {
-        for (UserChat user : userChats) {
-            bot.forwardMessage(user.getId(), message);
+        if (players.size() >= 10) {
+            bot.sendText(user.getId(), "Максимум игроков — 10.");
+            return false;
         }
-    }
-
-    private void calculateScores() {
-        if (getConspirator().getVotes() > 1) {
-            getConspirator().setCurrentRoundScore(0);
-            getActivePlayer().setCurrentRoundScore(0);
-        } else if (getConspirator().getVotes() == 1) {
-            getConspirator().setCurrentRoundScore(conspirator_score - 1);
-            getActivePlayer().setCurrentRoundScore(active_player_score - 1);
-        } else {
-            getConspirator().setCurrentRoundScore(conspirator_score);
-            getActivePlayer().setCurrentRoundScore(active_player_score);
-        }
-        for (int i = 0; i < userChats.size(); i++) {
-            if (i != conspiratorIndex && i != indexActivePlayer) {
-                if (userChats.get(i).isGuessed())
-                    userChats.get(i).setCurrentRoundScore(guessed_score);
-                else
-                    userChats.get(i).setCurrentRoundScore(0);
-                userChats.get(i).setDeductedPoints(userChats.get(i).getVotes() * deducted_score);
-            } else {
-                userChats.get(i).setDeductedPoints(0);
-            }
-        }
-    }
-
-    private String buildListUsersScore() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Конспиратор - ").append(getConspirator().getName()).append("\n");
-        UserChat[] usersScore = sortedUsers();
-        for (int i = 0; i < usersScore.length; i++) {
-            sb.append(i + 1).append(". ").append(usersScore[i].getName()).append(" = ").append(usersScore[i].getScore());
-            sb.append(" (").append(usersScore[i].getCurrentRoundScore()).append(" -").append(usersScore[i].getDeductedPoints()).append(")\n");
-        }
-        return sb.toString();
-    }
-
-    private UserChat[] sortedUsers() {
-        UserChat[] usersScore = new UserChat[userChats.size()];
-        usersScore = userChats.toArray(usersScore);
-        for (int i = 0; i < usersScore.length; i++)
-            for (int g = 0; g < usersScore.length - 1; g++) {
-                if (usersScore[g + 1].getScore() > usersScore[g].getScore()) {
-                    UserChat temp = usersScore[g];
-                    usersScore[g] = usersScore[g + 1];
-                    usersScore[g + 1] = temp;
-                }
-            }
-        return usersScore;
-    }
-
-    private void nextRound() {
-        UserChat activePlayer = getActivePlayer();
-        activePlayer.setStatus(UserChat.ACTIVE_PLAYER);
-        for (UserChat userChat : userChats) {
-            userChat.resetTable();
-            for (int i = 0; i < count_card_on_round; i++)
-                userChat.addCard(getNextCard());
-            bot.sendText(userChat.getId(), "Следующий раунд");
-            bot.sendText(userChat.getId(), activePlayer.getName() + " - активный игрок");
-            bot.sendKeyBoard(userChat.getId(), "Ожидаем ассоциацию", userChat.getCards());
-        }
-    }
-
-    private void requestConfirmation(UserChat user, int status) {
-        user.setStatus(status);
-        bot.sendKeyBoard(user.getId(), "Вы уверены?", yesno);
-    }
-
-    private String getNextCard() {
-        if (cards.empty()) {
-            cards = getCards();
-            Collections.shuffle(cards, rand);
-        }
-        return cards.pop();
-    }
-
-    private void sendCard(UserChat user) {
-        StringBuilder sb = new StringBuilder();
-        user.moveCardToTable(card);
-        for (int i = indexActivePlayer, g = 0; g < userChats.size(); g++) {
-            if (userChats.get(i).getTable().size() > 0) {
-                sb.append(userChats.get(i).getName());
-                sb.append(" (");
-                for (int x = 0; x < userChats.get(i).getTable().size(); x++) {
-                    if (x != 0)
-                        sb.append(", ");
-                    sb.append(userChats.get(i).getTable().get(x));
-                }
-                sb.append(")\n");
-            }
-            i++;
-            if (i >= userChats.size())
-                i = 0;
-        }
-        bot.sendKeyBoard(user.getId(), "Ок", user.getCards());
-        sendTextToAll(sb.toString());
-        int ind = userChats.indexOf(user);
-        ind++;
-        if (ind >= userChats.size())
-            ind = 0;
-        user.setStatus(UserChat.OK);
-        userChats.get(ind).setStatus(UserChat.ACTIVE_PLAYER_X);
-        if (userChats.get(ind).getTable().size() >= count_card_on_round) {
-            runVote();
-        } else {
-            sendTextToAll(userChats.get(ind).getName() + " кладет карточку");
-            bot.sendKeyBoard(userChats.get(ind).getId(), "Выберите слово", userChats.get(ind).getCards());
-        }
-    }
-
-    private void checkVote(Message msg, UserChat user) {
-        UserChat voteUser = findUser(msg.getText());
-        if (voteUser == null)
-            bot.sendText(user.getId(), "Пожалуйста выберите игрока с помощью кнопок");
-        else {
-            user.setVoteUser(voteUser);
-            requestConfirmation(user, UserChat.VOTE_X);
-        }
-    }
-
-    private void checkCard(Message msg, UserChat user) {
-        card = "";
-        for (String c : user.getCards()) {
-            if (c.equals(msg.getText()))
-                card = c;
-        }
-        if (!card.isEmpty()) {
-            requestConfirmation(user, UserChat.ACTIVE_PLAYER_Z);
-        } else {
-            bot.sendText(user.getId(), "Воспользуйтесь кнопками бота для отправки слова");
-        }
-    }
-
-    private void sendAssociate(Message msg, UserChat user) {
-        associate = msg;
-        conspiratorIndex = rand.nextInt(userChats.size());
-        while (conspiratorIndex == indexActivePlayer)
-            conspiratorIndex = rand.nextInt(userChats.size());
-        getConspirator().setStatus(UserChat.CONSPIRATOR);
-        for (UserChat player : userChats) {
-            if (player.getStatus() == UserChat.CONSPIRATOR)
-                bot.sendText(player.getId(), "Вы конспиратор");
-            else bot.forwardMessage(player.getId(), associate);
-        }
-        if (type_game == FULL_ONLINE) {
-            user.setStatus(UserChat.ACTIVE_PLAYER_X);
-            bot.sendKeyBoard(user.getId(), "Отправьте первое слово", user.getCards());
-        } else {
-            sendButtonBeginDiscussion(user);
-        }
-    }
-
-    private void sendButtonBeginDiscussion(UserChat user) {
-        user.setStatus(UserChat.ACTIVE_PLAYER_X);
-        List<String> buttons = new ArrayList<>();
-        buttons.add(BEGIN_DISCUSSION);
-        bot.sendKeyBoard(user.getId(), "Нажмите на кнопку, когда все положат по 2 карточки", buttons);
-    }
-
-    private void enterCountPlayers(Message msg, UserChat user) {
-
-        if (msg.getText() != null)
-            try {
-                int x = Integer.parseInt(msg.getText().trim());
-                if (x >= MIN_COUNT_PLAYERS) {
-                    countPlayers = x;
-                    user.setStatus(UserChat.ENTER_TYPE_GAME);
-                    bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
-                } else {
-                    bot.sendText(user.getId(), "Количество игроков не может быть меньше " + MIN_COUNT_PLAYERS);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
-    }
-
-    private void enterTypeGame(Message msg, UserChat user) {
-
-        if (msg.getText() != null)
-            try {
-                if (msg.getText().equals(YES))
-                    type_game = FULL_ONLINE;
-                else type_game = WITHOUT_CARDS;
-                user.setStatus(UserChat.ENTER_COUNT_ROUNDS);
-                bot.sendText(user.getId(), "Введите количество раундов");
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
-    }
-
-    private void enterCountRounds(Message msg, UserChat user) {
-
-        if (msg.getText() != null)
-            try {
-                countRounds = Integer.parseInt(msg.getText());
-                user.setStatus(UserChat.ENTER_COUNT_CARDS);
-                bot.sendText(user.getId(), "Введите количество карточек на руках");
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
-    }
-
-    private void enterCountCards(Message msg, UserChat user) {
-
-        if (msg.getText() != null)
-            try {
-                count_cards_on_hands = Integer.parseInt(msg.getText());
-                user.setStatus(UserChat.OK);
-                bot.sendText(user.getId(), "Ожидаем подключения всех игроков");
-                finishSetting = true;
-                if (enterNames == countPlayers)
-                    beginGame();
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
+        user.setStatus(UserChat.ENTER_NAME);
+        user.setGame(this);
+        bot.sendText(user.getId(), "Введите имя, которым будете играть.");
+        if (!players.contains(user)) players.add(user);
+        return true;
     }
 
     private void enterName(Message msg, UserChat user) {
-        Long id = user.getId();
-        String name = msg.getText();
-        UserChat userForName = findUser(name);
-        if (userForName == null || userForName == user) {
-            user.setName(name);
-            enterNames++;
-            if (userChats.indexOf(user) == 0) {
-                user.setStatus(UserChat.ENTER_COUNT_PLAYERS);
-                bot.sendText(id, "Введите количество игроков");
-            } else {
-                user.setStatus(UserChat.OK);
-                if (enterNames < countPlayers || !finishSetting)
-                    bot.sendText(id, "Ожидаем подключения всех игроков");
-                else {
-                    beginGame();
-                }
-            }
-        } else bot.sendText(id, "Пожалуйста введите другое имя, данное имя уже занято");
+        if (!msg.hasText()) {
+            bot.sendText(user.getId(), "Отправьте текстом желаемое имя.");
+            return;
+        }
+        String name = msg.getText().trim();
+        if (name.isEmpty()) {
+            bot.sendText(user.getId(), "Имя не может быть пустым.");
+            return;
+        }
+        if (findUserByName(name) != null) {
+            bot.sendText(user.getId(), "Такое имя уже занято. Выберите другое.");
+            return;
+        }
+        user.setName(name);
+        user.setStatus(UserChat.OK);
+        sendLobbyState();
+        sendStartButtonToLeaderIfReady();
     }
 
-    private void beginGame() {
-        sendTextToAll("Начинаем!");
-        for (UserChat userChat : userChats) {
-            userChat.getCards().clear();
-            userChat.setScore(0);
-            for (int i = 0; i < count_cards_on_hands - count_card_on_round; i++) {
-                userChat.addCard(getNextCard());
+    private void handleOk(Message msg, UserChat user) {
+        if (msg.hasText() && START_GAME.equals(msg.getText())) {
+            if (!isLeader(user)) {
+                bot.sendText(user.getId(), "Только лидер может запускать игру.");
+                return;
+            }
+            if (players.size() < 5 || players.size() > 10) {
+                bot.sendText(user.getId(), "Для старта нужно 5–10 игроков.");
+                return;
+            }
+            startGame();
+            return;
+        }
+        // Ignore other messages in OK state
+    }
+
+    private void handleTeamSelection(Message msg, UserChat leader) {
+        if (!msg.hasText()) return;
+        String t = msg.getText();
+        int required = requiredTeamSize();
+        if (DONE.equals(t)) {
+            if (proposedTeam.size() != required) {
+                bot.sendText(leader.getId(), "Нужно выбрать ровно " + required + " игрок(а).");
+                presentTeamSelection(leader);
+                return;
+            }
+            startTeamVote();
+            return;
+        }
+        if (RESET.equals(t)) {
+            proposedTeam.clear();
+            presentTeamSelection(leader);
+            return;
+        }
+        if (t.startsWith(ADD_PREFIX)) {
+            String name = t.substring(ADD_PREFIX.length()).trim();
+            UserChat u = findUserByName(name);
+            if (u != null && !proposedTeam.contains(u) && proposedTeam.size() < required) {
+                proposedTeam.add(u);
+            }
+            presentTeamSelection(leader);
+            return;
+        }
+        if (t.startsWith(REMOVE_PREFIX)) {
+            String name = t.substring(REMOVE_PREFIX.length()).trim();
+            UserChat u = findUserByName(name);
+            proposedTeam.remove(u);
+            presentTeamSelection(leader);
+        }
+    }
+
+    private void handleTeamVote(Message msg, UserChat user) {
+        if (!msg.hasText()) return;
+        String t = msg.getText();
+        if (YES.equals(t)) teamVotes.put(user.getId(), true);
+        else if (NO.equals(t)) teamVotes.put(user.getId(), false);
+        else {
+            bot.sendText(user.getId(), "Пожалуйста, используйте кнопки Да/Нет.");
+            return;
+        }
+        user.setStatus(UserChat.OK);
+        if (teamVotes.size() == players.size()) finalizeTeamVote();
+    }
+
+    private void handleMissionVote(Message msg, UserChat user) {
+        if (!msg.hasText()) return;
+        String t = msg.getText();
+        if (MISSION_SUCCESS.equals(t)) missionVotes.put(user.getId(), true);
+        else if (MISSION_FAIL.equals(t)) {
+            // На миссии "Нет" трактуем как Провал (доступно только шпионам)
+            if (!user.isSpy()) {
+                bot.sendText(user.getId(), "Рабочим доступен только 'Успех'.");
+                return;
+            }
+            missionVotes.put(user.getId(), false);
+        } else {
+            bot.sendText(user.getId(), "Используйте кнопки.");
+            return;
+        }
+        user.setStatus(UserChat.OK);
+        if (missionVotes.size() == proposedTeam.size()) finalizeMission();
+    }
+
+    private boolean isLeader(UserChat user) {
+        return players.indexOf(user) == leaderIndex;
+    }
+
+    private void sendLobbyState() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Лобби (игроков: ").append(players.size()).append(")\n");
+        for (UserChat p : players) {
+            sb.append("- ").append(p.getName() == null ? "(без имени)" : p.getName()).append('\n');
+        }
+        if (!players.isEmpty()) {
+            sb.append("Лидер: ").append(players.get(leaderIndex).getName() == null ? "(без имени)" : players.get(leaderIndex).getName());
+        }
+        sendTextToAll(sb.toString());
+    }
+
+    private void sendStartButtonToLeaderIfReady() {
+        if (players.size() >= 5 && players.size() <= 10) {
+            UserChat leader = players.get(leaderIndex);
+            List<String> b = Collections.singletonList(START_GAME);
+            bot.sendKeyBoard(leader.getId(), "Готовы? Лидер может начать игру.", b);
+        }
+    }
+
+    private void startGame() {
+        started = true;
+        assignRoles();
+        // Сообщения о ролях в личку
+        List<String> spyNames = new ArrayList<>();
+        for (UserChat p : players) if (p.isSpy()) spyNames.add(p.getName());
+        for (UserChat p : players) {
+            if (p.isSpy()) {
+                bot.sendText(p.getId(), "Ваша роль: Шпион\nШпионы: " + String.join(", ", spyNames));
+            } else {
+                bot.sendText(p.getId(), "Ваша роль: Рабочий");
             }
         }
-        nextRound();
-
-
+        missionNumber = 1;
+        successes = 0;
+        failures = 0;
+        rejectsInRow = 0;
+        startMission();
     }
 
-    private UserChat getConspirator() {
-        return userChats.get(conspiratorIndex);
+    private void startMission() {
+        proposedTeam.clear();
+        teamVotes.clear();
+        missionVotes.clear();
+        int required = requiredTeamSize();
+        String header = "Работа  " + missionNumber + ". Требуется игроков: " + required +
+                "\nЛидер: " + players.get(leaderIndex).getName();
+        sendTextToAll(header);
+        UserChat leader = players.get(leaderIndex);
+        leader.setStatus(UserChat.TEAM_SELECTION);
+        presentTeamSelection(leader);
     }
 
-    private UserChat getActivePlayer() {
-        return userChats.get(indexActivePlayer);
-    }
-
-    private List<String> calculateButtonsForVote(UserChat user) {
+    private void presentTeamSelection(UserChat leader) {
+        int required = requiredTeamSize();
         List<String> buttons = new ArrayList<>();
-        for (int i = 0; i < userChats.size(); i++) {
-            if (i != indexActivePlayer && !userChats.get(i).getId().equals(user.getId())) {
-                buttons.add(userChats.get(i).getName());
-            }
-
+        for (UserChat p : players) {
+            if (proposedTeam.contains(p)) buttons.add(REMOVE_PREFIX + p.getName());
+            else buttons.add(ADD_PREFIX + p.getName());
         }
-        return buttons;
+        buttons.add(DONE);
+        buttons.add(RESET);
+        bot.sendKeyBoard(leader.getId(),
+                "Выберите " + required + " игрок(а) (выбрано: " + proposedTeam.size() + ")",
+                buttons);
     }
 
-    private void runVote() {
-        countVotePlayers = 0;
-        sendTextToAll("Ассоциация:");
-        forwardMsgToAll(associate);
-        for (UserChat userChat : userChats) {
-            userChat.resetVotes();
-            userChat.setGuessed(false);
-            if (userChat.getStatus() == UserChat.ACTIVE_PLAYER_X) {
-                userChat.setStatus(UserChat.OK);
-                bot.sendText(userChat.getId(), "Объясните почему Вы положили именно эти карточки и ждите результата голосования");
-            } else {
-                userChat.setStatus(UserChat.VOTE);
-                bot.sendKeyBoard(userChat.getId(), "Расскажите почему Вы положили именно эти карточки," +
-                        "выслушайте других участников и проголосуйте за того,"
-                        + " кто по вашему мнению является конспиратором", calculateButtonsForVote(userChat));
+    private void startTeamVote() {
+        teamVotes.clear();
+        String teamList = formatNames(proposedTeam);
+        for (UserChat p : players) {
+            p.setStatus(UserChat.TEAM_VOTE);
+            bot.sendKeyBoard(p.getId(), "Голосование за команду: " + teamList + "\nОдобрить?", Arrays.asList(YES, NO));
+        }
+        sendTextToAll("Идёт голосование за команду.");
+    }
+
+    private void finalizeTeamVote() {
+        int approves = 0;
+        int rejects = 0;
+        StringBuilder sb = new StringBuilder();
+        sb.append("Результаты голосования:\n");
+        for (UserChat p : players) {
+            Boolean v = teamVotes.get(p.getId());
+            boolean approve = v != null && v;
+            if (approve) approves++; else rejects++;
+            sb.append(p.getName()).append(": ").append(approve ? YES : NO).append('\n');
+        }
+        boolean approved = approves > rejects; // простое большинство
+        sb.append("Итого: ").append(approves).append(" за / ").append(rejects).append(" против.\n");
+        sb.append(approved ? "Команда одобрена." : "Команда отклонена.");
+        sendTextToAll(sb.toString());
+        for (UserChat p : players) p.setStatus(UserChat.OK);
+
+        if (!approved) {
+            rejectsInRow++;
+            if (rejectsInRow >= 5) {
+                spiesWin("5 отклонений команды подряд.");
+                return;
             }
+            leaderIndex = (leaderIndex + 1) % players.size();
+            startMission();
+        } else {
+            rejectsInRow = 0;
+            startMissionVoting();
         }
     }
 
-    Stack<String> getCards() {
-        Stack<String> result = new Stack<>();
-        try {
-            File file = new File(WORDS_FILE_NAME);
-            //создаем объект FileReader для объекта File
-            FileReader fr = new FileReader(file);
-            //создаем BufferedReader с существующего FileReader для построчного считывания
-            BufferedReader reader = new BufferedReader(fr);
-            // считаем сначала первую строку
-            String line = reader.readLine();
-            while (line != null) {
-                line = line.trim();
-                if (!line.isEmpty()) {
-                    result.push(line);
+    private void startMissionVoting() {
+        missionVotes.clear();
+        sendTextToAll("Команда отправилась на работу.");
+        for (UserChat p : players) {
+            if (proposedTeam.contains(p)) {
+                p.setStatus(UserChat.MISSION_VOTE);
+                if (p.isSpy()) {
+                    bot.sendKeyBoard(p.getId(), "Вы на работе. Ваш голос:", Arrays.asList(MISSION_SUCCESS, MISSION_FAIL));
+                } else {
+                    bot.sendKeyBoard(p.getId(), "Вы на работе. Рабочий: только Успех.", Collections.singletonList(MISSION_SUCCESS));
                 }
-                // считываем остальные строки в цикле
-                line = reader.readLine();
+            } else {
+                p.setStatus(UserChat.OK);
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-        return result;
     }
 
-    public int getId() {
-        return id;
+    private void finalizeMission() {
+        int fails = 0;
+        for (UserChat p : proposedTeam) {
+            Boolean v = missionVotes.get(p.getId());
+            if (v != null && !v) fails++;
+        }
+        boolean twoFailsRequired = false;//players.size() >= 7 && missionNumber == 4;
+        boolean missionFailed = twoFailsRequired ? (fails >= 2) : (fails >= 1);
+
+        if (missionFailed) {
+            failures++;
+            sendTextToAll("Работа " + missionNumber + " провалена (жетоны провала: " + fails + ")\nСчёт: Успехов=" + successes + ", Провалов=" + failures);
+        } else {
+            successes++;
+            sendTextToAll("Работа " + missionNumber + " успешна\nСчёт: Успехов=" + successes + ", Провалов=" + failures);
+        }
+
+        if (successes >= 3) {
+            resistanceWin("3 успешные работы.");
+            return;
+        }
+        if (failures >= 3) {
+            spiesWin("3 провальные работы.");
+            return;
+        }
+
+        missionNumber++;
+        leaderIndex = (leaderIndex + 1) % players.size();
+        startMission();
     }
 
-    public void setId(int id) {
-        this.id = id;
+    private void resistanceWin(String reason) {
+        sendTextToAll("Победа Рабочих! " + (reason == null ? "" : reason));
+        revealSpies();
+        finishGame("Игра окончена.");
+    }
+
+    private void spiesWin(String reason) {
+        sendTextToAll("Победа Шпионов! " + (reason == null ? "" : reason));
+        revealSpies();
+        finishGame("Игра окончена.");
+    }
+
+    private void finishGame(String finalMsg) {
+        if (finalMsg != null) sendTextToAll(finalMsg);
+        for (UserChat p : players) p.setGame(null);
+        bot.removeGame(this);
+    }
+
+    private String formatNames(List<UserChat> list) {
+        List<String> names = new ArrayList<>();
+        for (UserChat u : list) names.add(u.getName());
+        return String.join(", ", names);
+    }
+
+    private void revealSpies() {
+        List<String> spies = new ArrayList<>();
+        for (UserChat p : players) {
+            if (p.isSpy()) spies.add(p.getName());
+        }
+        String msg = spies.isEmpty() ? "(шпионов не обнаружено)" : String.join(", ", spies);
+        sendTextToAll("Шпионы: " + msg);
+    }
+
+    private int requiredTeamSize() {
+        int n = players.size();
+        // Таблица из правил (кол-во игроков команды по миссиям)
+        // индексируем игроков 5..10, миссии 1..5
+        int[][] table = new int[][]{
+                // 5, 6, 7, 8, 9, 10
+                {2, 2, 2, 3, 3, 3},   // миссия 1
+                {3, 3, 3, 4, 4, 4},   // миссия 2
+                {2, 4, 3, 4, 4, 4},   // миссия 3
+                {3, 3, 4, 5, 5, 5},   // миссия 4
+                {3, 4, 4, 5, 5, 5}    // миссия 5
+        };
+        int col;
+        if (n < 5) col = 0; else if (n > 10) col = 5; else col = n - 5;
+        int row = missionNumber - 1;
+        if (row < 0) row = 0;
+        if (row > 4) row = 4;
+        return table[row][col];
+    }
+
+    private void assignRoles() {
+        int n = players.size();
+        int spies = spiesCount(n);
+        List<Integer> idxs = new ArrayList<>();
+        for (int i = 0; i < n; i++) idxs.add(i);
+        Collections.shuffle(idxs, rand);
+        Set<Integer> spyIdx = new HashSet<>(idxs.subList(0, spies));
+        for (int i = 0; i < n; i++) {
+            players.get(i).setSpy(spyIdx.contains(i));
+        }
+    }
+
+    private int spiesCount(int n) {
+        // Классическая раскладка: 5->2, 6->2, 7->3, 8->3, 9->3, 10->4
+        switch (n) {
+            case 5:
+            case 6:
+                return 2;
+            case 7:
+            case 8:
+            case 9:
+                return 3;
+            case 10:
+                return 4;
+            default:
+                return Math.max(2, (n - 1) / 3); // fallback
+        }
+    }
+
+    private void sendTextToAll(String text) {
+        for (UserChat user : players) {
+            bot.sendText(user.getId(), text);
+        }
     }
 }

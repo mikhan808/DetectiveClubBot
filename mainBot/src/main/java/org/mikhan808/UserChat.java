@@ -28,10 +28,15 @@ public class UserChat {
     public final static int JOIN_GAME = 11;
     public final static int ENTER_COUNT_ROUNDS = 12;
     public final static int ENTER_COUNT_CARDS = 13;
+    // New statuses for The Resistance
+    public final static int TEAM_SELECTION = 20;   // лидер выбирает команду
+    public final static int TEAM_VOTE = 21;        // голосование за команду
+    public final static int MISSION_VOTE = 22;     // голосование на миссии
     private Game game;
 
     private UserChat voteUser;
     private int deductedPoints;
+    private boolean spy; // роль для Сопротивления
 
     public UserChat(Long id, String name) {
         this.id = id;
@@ -148,5 +153,12 @@ public class UserChat {
     public void setGame(Game game) {
         this.game = game;
     }
-}
 
+    public boolean isSpy() {
+        return spy;
+    }
+
+    public void setSpy(boolean spy) {
+        this.spy = spy;
+    }
+}

@@ -19,10 +19,11 @@ public class Bot extends TelegramLongPollingBot {
     public static final String NO = "Нет";
     public static final String CREATE_GAME = "Создать игру";
     public static final String JOIN_GAME = "Присоединиться к игре";
-    private final List<String> createOrJoinButtons;
-    List<Game> games;
-    Random rand;
 
+    private final List<String> createOrJoinButtons;
+    private final List<Game> games;
+    private final Random rand;
+    private final List<UserChat> userChats;
 
     public Bot() {
         super();
@@ -33,9 +34,6 @@ public class Bot extends TelegramLongPollingBot {
         createOrJoinButtons.add(CREATE_GAME);
         createOrJoinButtons.add(JOIN_GAME);
     }
-
-
-    List<UserChat> userChats;
 
     @Override
     public String getBotUsername() {
@@ -56,9 +54,8 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public UserChat findUser(String name) {
-
         for (UserChat user : userChats) {
-            if (name.trim().equalsIgnoreCase(user.getName()))
+            if (name != null && name.trim().equalsIgnoreCase(user.getName()))
                 return user;
         }
         return null;
@@ -82,6 +79,8 @@ public class Bot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         try {
+            if (update == null || update.getMessage() == null)
+                return;
             Message msg = update.getMessage();
             Long id = msg.getChatId();
             UserChat user = findUser(id);
@@ -93,34 +92,34 @@ public class Bot extends TelegramLongPollingBot {
                             Game game = findGame(x);
                             if (game == null || !game.addPlayer(user)) {
                                 user.setStatus(UserChat.OK);
-                                sendKeyBoard(id, "Попробуйте еще раз", createOrJoinButtons);
+                                sendKeyBoard(id, "Выберите действие:", createOrJoinButtons);
                             }
                         } catch (Exception e) {
-                            e.printStackTrace();
                             user.setStatus(UserChat.OK);
-                            sendKeyBoard(user.getId(), "Номер игры должен быть числом. Попробуйте заново", createOrJoinButtons);
+                            sendKeyBoard(user.getId(), "Неверный идентификатор игры. Попробуйте ещё раз.", createOrJoinButtons);
                         }
                     } else {
-                        if (msg.getText().equals(CREATE_GAME)) {
+                        if (msg.hasText() && CREATE_GAME.equals(msg.getText())) {
                             Game game = new Game(this);
                             games.add(game);
                             user.setGame(game);
                             game.setId(randIDForGame());
-                            sendText(id, "№ игры = " + game.getId());
+                            sendText(id, "ID игры = " + game.getId());
                             if (!game.addPlayer(user))
-                                sendKeyBoard(id, "Попробуйте еще раз", createOrJoinButtons);
-                        } else if (msg.getText().equals(JOIN_GAME)) {
+                                sendKeyBoard(id, "Выберите действие:", createOrJoinButtons);
+                        } else if (msg.hasText() && JOIN_GAME.equals(msg.getText())) {
                             user.setStatus(UserChat.JOIN_GAME);
-                            sendText(id, "Введите номер игры");
+                            sendText(id, "Введите ID игры");
                         } else {
-                            sendKeyBoard(id, "Попробуйте еще раз", createOrJoinButtons);
+                            sendKeyBoard(id, "Выберите действие:", createOrJoinButtons);
                         }
-
                     }
-                } else user.getGame().readMsg(update);
+                } else {
+                    user.getGame().readMsg(update);
+                }
             } else {
                 user = new UserChat(id, null);
-                sendKeyBoard(id, "Добро пожаловать", createOrJoinButtons);
+                sendKeyBoard(id, "Добро пожаловать!", createOrJoinButtons);
                 userChats.add(user);
                 user.setStatus(UserChat.OK);
             }
@@ -132,7 +131,6 @@ public class Bot extends TelegramLongPollingBot {
     public void removeGame(Game game) {
         games.remove(game);
     }
-
 
     public void forwardMessage(Long chatId, Message msg) {
         CopyMessage copyMessage = new CopyMessage();
@@ -146,12 +144,11 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-
     public void sendText(Long chatId, String text) {
         SendMessage s = new SendMessage();
-        s.setChatId(chatId.toString()); // Боту может писать не один человек, и поэтому чтобы отправить сообщение, грубо говоря нужно узнать куда его отправлять
+        s.setChatId(chatId.toString());
         s.setText(text);
-        try { //Чтобы не крашнулась программа при вылете Exception
+        try {
             execute(s);
         } catch (TelegramApiException e) {
             e.printStackTrace();
@@ -160,7 +157,7 @@ public class Bot extends TelegramLongPollingBot {
 
     public void sendKeyBoard(Long chatId, String text, List<String> buttons) {
         SendMessage sendMessage = new SendMessage();
-        sendMessage.enableMarkdown(true);
+        sendMessage.enableMarkdown(false);
         List<KeyboardRow> keyboard = new ArrayList<>();
         for (int i = 0; i < buttons.size(); i += 2) {
             KeyboardRow keyboardRow = new KeyboardRow();
@@ -182,6 +179,5 @@ public class Bot extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
-
-
 }
+
