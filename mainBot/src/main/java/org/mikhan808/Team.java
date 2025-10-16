@@ -18,6 +18,7 @@ public class Team {
     private final List<String> resultVotes;
     private final List<String> votes;
     private int indexActivePlayer = 0;
+    private boolean firstTurn = true;
 
 
     public Team() {
@@ -111,6 +112,14 @@ public class Team {
         indexActivePlayer++;
         if (indexActivePlayer >= userChats.size())
             indexActivePlayer = 0;
+    }
+
+    public boolean isFirstTurn() {
+        return firstTurn;
+    }
+
+    public void setFirstTurn(boolean firstTurn) {
+        this.firstTurn = firstTurn;
     }
 
 }

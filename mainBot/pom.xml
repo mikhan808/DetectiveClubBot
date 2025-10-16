@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <httpcompontents.version>4.5.3</httpcompontents.version>
-        <telegrambots.version>5.0.1</telegrambots.version>
+        <telegrambots.version>6.9.7.1</telegrambots.version>
         <json.version>20160810</json.version>
         <jsoup.version>1.10.2</jsoup.version>
         <mysql.version>6.0.6</mysql.version>
@@ -101,7 +101,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>botigra.Main</mainClass>
+                            <mainClass>org.mikhan808.Main</mainClass>
                             <packageName>botigra</packageName>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>

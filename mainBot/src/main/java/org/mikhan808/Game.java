@@ -3,10 +3,9 @@ package org.mikhan808;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.mikhan808.Bot.NO;
@@ -37,7 +36,7 @@ public class Game {
         userChats = new ArrayList<>();
         teams = new ArrayList<>();
         rand = new Random();
-        cards = getCards();
+        cards = loadCards();
         Collections.shuffle(cards, rand);
         yesno = new ArrayList<>();
         yesno.add(YES);
@@ -108,7 +107,7 @@ public class Game {
 
         } else {
             bot.sendText(id, "Почему то вас нет в списках попробуйте присоединиться к другой игре");
-            user.setGame(null);
+            bot.findUser(id).setGame(null);
         }
     }
 
@@ -264,7 +263,7 @@ public class Game {
 
     private String getNextCard() {
         if (cards.empty()) {
-            cards = getCards();
+            cards = loadCards();
             Collections.shuffle(cards, rand);
         }
         return cards.pop();
@@ -272,7 +271,7 @@ public class Game {
 
 
     private void checkVote(Message msg, UserChat user) {
-        if (countPlayers >= teams.size()) {
+        if (countVotePlayers >= teams.size()) {
             showResult();
         } else {
             if (!user.getTeam().removeVote(msg.getText()))
@@ -284,12 +283,31 @@ public class Game {
     }
 
     private void saveAssociate(Message msg, UserChat user) {
+        // Disallow reusing the same textual clue within the same game for this team
+        if (msg.hasText() && isClueTextUsed(getActiveTeam(), msg.getText())) {
+            bot.sendText(user.getId(), "�?� �����?�?�? �?���?���?���?�?�?���. �������� ��������� ��������.");
+            return;
+        }
         getActiveTeam().getCurrentAssociates().put(getActiveTeam().getCards().get(code[indexCode]), msg);
         if (indexCode < code.length - 1) {
             requestAssociate();
         } else {
             beginDiscussion();
         }
+    }
+
+    private boolean isClueTextUsed(Team team, String text) {
+        if (text == null) return false;
+        for (String key : team.getAssociates().keySet()) {
+            List<Message> history = team.getAssociates().get(key);
+            for (Message m : history) {
+                if (m != null && m.hasText() && text.equalsIgnoreCase(m.getText())) return true;
+            }
+        }
+        for (Message m : team.getCurrentAssociates().values()) {
+            if (m != null && m.hasText() && text.equalsIgnoreCase(m.getText())) return true;
+        }
+        return false;
     }
 
     private void beginDiscussion() {
@@ -470,7 +488,7 @@ public class Game {
                     break;
                 }
             }
-            if (guessed && team != getActiveTeam())
+            if (guessed && team != getActiveTeam() && !getActiveTeam().isFirstTurn())
                 team.winCards++;
             else if (!guessed && team == getActiveTeam())
                 team.loseCards++;
@@ -479,6 +497,7 @@ public class Game {
         }
 
         sendTextToAll(sb.toString());
+        getActiveTeam().setFirstTurn(false);
         boolean end = false;
         for (Team team : teams) {
             if (team.winCards == WIN_CARDS) {
@@ -515,14 +534,75 @@ public class Game {
         requestVote(user);
     }
 
+    Stack<String> loadCards() {
+        Stack<String> result = new Stack<>();
+
+        java.util.function.Function<String, List<String>> readFromClasspath = (charsetName) -> {
+            List<String> lines = new ArrayList<>();
+            try (InputStream is = Game.class.getClassLoader().getResourceAsStream(WORDS_FILE_NAME)) {
+                if (is == null) return lines;
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, Charset.forName(charsetName)))) {
+                    String line = reader.readLine();
+                    while (line != null) {
+                        line = line.trim();
+                        if (!line.isEmpty()) lines.add(line);
+                        line = reader.readLine();
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+            return lines;
+        };
+
+        java.util.function.Function<String, List<String>> readFromFile = (charsetName) -> {
+            List<String> lines = new ArrayList<>();
+            try {
+                File file = new File(WORDS_FILE_NAME);
+                if (file.exists()) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(file), Charset.forName(charsetName)))) {
+                        String line = reader.readLine();
+                        while (line != null) {
+                            line = line.trim();
+                            if (!line.isEmpty()) lines.add(line);
+                            line = reader.readLine();
+                        }
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+            return lines;
+        };
+
+        // 1) Try classpath UTF-8
+        List<String> lines = readFromClasspath.apply("UTF8");
+        // 2) Fallback to filesystem UTF-8
+        if (lines.isEmpty()) lines = readFromFile.apply("UTF8");
+        // 3) If looks garbled (U+FFFD), try Windows-1251 from classpath, then filesystem
+        boolean hasReplacement = false;
+        for (String s : lines) {
+            if (s.indexOf('\uFFFD') >= 0) {
+                hasReplacement = true;
+                break;
+            }
+        }
+        if (hasReplacement) {
+            List<String> alt = readFromClasspath.apply("windows-1251");
+            if (alt.isEmpty()) alt = readFromFile.apply("windows-1251");
+            if (!alt.isEmpty()) lines = alt;
+        }
+
+        for (String s : lines) result.push(s);
+        return result;
+    }
+
     Stack<String> getCards() {
         Stack<String> result = new Stack<>();
         try {
             File file = new File(WORDS_FILE_NAME);
             //создаем объект FileReader для объекта File
-            FileReader fr = new FileReader(file);
+
             //создаем BufferedReader с существующего FileReader для построчного считывания
-            BufferedReader reader = new BufferedReader(fr);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(file), StandardCharsets.UTF_8));
             // считаем сначала первую строку
             String line = reader.readLine();
             while (line != null) {
@@ -535,6 +615,33 @@ public class Game {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+        // Fallback: if text looks garbled (contains Unicode replacement char),
+        // try reading the words file using Windows-1251 encoding.
+        boolean _hasReplacement = false;
+        for (String _s : result) {
+            if (_s.indexOf('\uFFFD') >= 0) {
+                _hasReplacement = true;
+                break;
+            }
+        }
+        if (_hasReplacement) {
+            try {
+                result.clear();
+                File file = new File(WORDS_FILE_NAME);
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(file), Charset.forName("windows-1251")));
+                String line = reader.readLine();
+                while (line != null) {
+                    line = line.trim();
+                    if (!line.isEmpty()) {
+                        result.push(line);
+                    }
+                    line = reader.readLine();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         return result;
     }

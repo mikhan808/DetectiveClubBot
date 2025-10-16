@@ -47,7 +47,7 @@ public class Bot extends TelegramLongPollingBot {
         return BotConfig.TOKEN;
     }
 
-    private UserChat findUser(Long id)
+    public UserChat findUser(Long id)
     {
         for (UserChat user:userChats)
         {
