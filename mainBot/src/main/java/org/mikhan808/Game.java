@@ -4,9 +4,10 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.mikhan808.Bot.NO;
@@ -19,7 +20,7 @@ public class Game {
     public static final int FULL_ONLINE = 0;
     public static final int WITHOUT_CARDS = 1;
     private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
-    private static final String WORDS_FILE_NAME = "Words.csv";
+    private static final String WORDS_RESOURCE_NAME = "Words.csv";
     private final int count_card_on_round = 2;
     private final int conspirator_score = 3;
     private final int active_player_score = 3;
@@ -508,11 +509,11 @@ public class Game {
     Stack<String> getCards() {
         Stack<String> result = new Stack<>();
         try {
-            File file = new File(WORDS_FILE_NAME);
-            //создаем объект FileReader для объекта File
-            FileReader fr = new FileReader(file);
-            //создаем BufferedReader с существующего FileReader для построчного считывания
-            BufferedReader reader = new BufferedReader(fr);
+            InputStream is = Game.class.getClassLoader().getResourceAsStream(WORDS_RESOURCE_NAME);
+            if (is == null) {
+                throw new IOException("Resource not found: " + WORDS_RESOURCE_NAME);
+            }
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
             // считаем сначала первую строку
             String line = reader.readLine();
             while (line != null) {
