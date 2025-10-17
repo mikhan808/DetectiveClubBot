@@ -20,15 +20,26 @@ public class UserChat {
     public final static int OK = 2;
     public final static int ACTIVE_PLAYER = 3;
     public final static int ENTER_COUNT_PLAYERS = 4;
-    public final static int CONSPIRATOR = 5;
+    public final static int CONSPIRATOR = 5; // Detective Club
+    // Decoder-specific statuses
+    public final static int DISCUSSION = 5; // Decoder
     public final static int ACTIVE_PLAYER_X = 6;
     public final static int VOTE = 7;
     public final static int VOTE_X = 9;
     public final static int ENTER_TYPE_GAME = 10;
+    public final static int ENTER_COUNT_TEAMS = 10; // Decoder
     public final static int JOIN_GAME = 11;
     public final static int ENTER_COUNT_ROUNDS = 12;
     public final static int ENTER_COUNT_CARDS = 13;
-    private Game game;
+    public final static int SELECT_GAME_TYPE = 99;
+    public final static int ENTER_NAME_TEAM = 14; // Decoder
+    // Resistance-specific statuses
+    public final static int TEAM_SELECTION = 20;
+    public final static int TEAM_VOTE = 21;
+    public final static int MISSION_VOTE = 22;
+    public int indexCode = 0; // Decoder
+    private GameSession game;
+    private Team team; // Decoder
 
     private UserChat voteUser;
     private int deductedPoints;
@@ -141,12 +152,19 @@ public class UserChat {
         score -= deductedPoints;
     }
 
-    public Game getGame() {
+    public GameSession getGame() {
         return game;
     }
 
-    public void setGame(Game game) {
+    public void setGame(GameSession game) {
         this.game = game;
     }
-}
 
+    public Team getTeam() {
+        return team;
+    }
+
+    public void setTeam(Team team) {
+        this.team = team;
+    }
+}

@@ -13,7 +13,7 @@ import java.util.*;
 import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
-public class Game {
+public class DetectiveClubGame implements GameSession {
     public static final int USER_SCORING = 1;
 
     public static final int MIN_COUNT_PLAYERS = 4;
@@ -45,7 +45,7 @@ public class Game {
     private String card;
     private int type_game = FULL_ONLINE;
 
-    public Game(Bot bot) {
+    public DetectiveClubGame(Bot bot) {
         this.bot = bot;
         userChats = new ArrayList<>();
         rand = new Random();
@@ -509,7 +509,7 @@ public class Game {
     Stack<String> getCards() {
         Stack<String> result = new Stack<>();
         try {
-            InputStream is = Game.class.getClassLoader().getResourceAsStream(WORDS_RESOURCE_NAME);
+            InputStream is = DetectiveClubGame.class.getClassLoader().getResourceAsStream(WORDS_RESOURCE_NAME);
             if (is == null) {
                 throw new IOException("Resource not found: " + WORDS_RESOURCE_NAME);
             }
@@ -538,3 +538,5 @@ public class Game {
         this.id = id;
     }
 }
+
+
