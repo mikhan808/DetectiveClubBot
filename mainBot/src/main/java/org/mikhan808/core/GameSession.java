@@ -1,4 +1,4 @@
-package org.mikhan808;
+package org.mikhan808.core;
 
 import org.telegram.telegrambots.meta.api.objects.Update;
 

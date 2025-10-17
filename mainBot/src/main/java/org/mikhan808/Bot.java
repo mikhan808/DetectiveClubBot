@@ -1,5 +1,11 @@
 package org.mikhan808;
 
+import org.mikhan808.core.Game;
+import org.mikhan808.core.LobbyUserChat;
+import org.mikhan808.core.UserChat;
+import org.mikhan808.games.decoder.DecoderGame;
+import org.mikhan808.games.detectiveclub.DetectiveClubGame;
+import org.mikhan808.games.resistance.ResistanceGame;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.CopyMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -22,7 +28,7 @@ public class Bot extends TelegramLongPollingBot {
 
     private final List<String> createOrJoinButtons;
     private final List<String> gameTypeButtons;
-    List<GameSession> games;
+    List<Game> games;
     Random rand;
 
     List<UserChat> userChats;
@@ -36,9 +42,9 @@ public class Bot extends TelegramLongPollingBot {
         createOrJoinButtons.add(CREATE_GAME);
         createOrJoinButtons.add(JOIN_GAME);
         gameTypeButtons = new ArrayList<>();
-        gameTypeButtons.add("Ассоциации");
-        gameTypeButtons.add("Декодер");
-        gameTypeButtons.add("Шпион");
+        gameTypeButtons.add("Detective Club");
+        gameTypeButtons.add("Decoder");
+        gameTypeButtons.add("Сопротивление");
     }
 
     @Override
@@ -59,8 +65,8 @@ public class Bot extends TelegramLongPollingBot {
         return null;
     }
 
-    private GameSession findGame(int id) {
-        for (GameSession game : games) {
+    private Game findGame(int id) {
+        for (Game game : games) {
             if (game.getId() == id)
                 return game;
         }
@@ -85,7 +91,7 @@ public class Bot extends TelegramLongPollingBot {
                     if (user.getStatus() == UserChat.JOIN_GAME) {
                         try {
                             int x = Integer.parseInt(msg.getText().trim());
-                            GameSession game = findGame(x);
+                            Game game = findGame(x);
                             if (game == null || !game.addPlayer(user)) {
                                 user.setStatus(UserChat.OK);
                                 sendKeyBoard(id, "Главное меню", createOrJoinButtons);
@@ -101,12 +107,12 @@ public class Bot extends TelegramLongPollingBot {
                             sendKeyBoard(id, "Выберите игру", gameTypeButtons);
                         } else if (user.getStatus() == UserChat.SELECT_GAME_TYPE) {
                             String choice = msg.getText();
-                            GameSession game = null;
-                            if ("Ассоциации".equals(choice)) {
+                            Game game = null;
+                            if ("Detective Club".equals(choice)) {
                                 game = new DetectiveClubGame(this);
-                            } else if ("Декодер".equals(choice)) {
+                            } else if ("Decoder".equals(choice)) {
                                 game = new DecoderGame(this);
-                            } else if ("Шпион".equals(choice)) {
+                            } else if ("Сопротивление".equals(choice) || "Resistance".equals(choice)) {
                                 game = new ResistanceGame(this);
                             }
                             if (game != null) {
@@ -129,7 +135,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                 } else user.getGame().readMsg(update);
             } else {
-                user = new UserChat(id, null);
+                user = new LobbyUserChat(id, null);
                 sendKeyBoard(id, "Привет! Выберите действие", createOrJoinButtons);
                 userChats.add(user);
                 user.setStatus(UserChat.OK);
@@ -139,7 +145,7 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    public void removeGame(GameSession game) {
+    public void removeGame(Game game) {
         games.remove(game);
     }
 

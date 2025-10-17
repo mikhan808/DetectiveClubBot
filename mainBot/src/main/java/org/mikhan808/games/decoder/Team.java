@@ -1,4 +1,4 @@
-package org.mikhan808;
+package org.mikhan808.games.decoder;
 
 import org.telegram.telegrambots.meta.api.objects.Message;
 
@@ -13,13 +13,12 @@ public class Team {
     private final Map<String, Message> currentAssociates;
     private final List<String> resultVotes;
     private final List<String> votes;
-    List<UserChat> userChats;
+    List<DecoderUserChat> userChats;
     int winCards = 0;
     int loseCards = 0;
     private String name;
     private int indexActivePlayer = 0;
     private boolean firstTurn = true;
-
 
     public Team() {
         userChats = new ArrayList<>();
@@ -38,11 +37,11 @@ public class Team {
         this.name = name;
     }
 
-    public UserChat getActivePlayer() {
+    public DecoderUserChat getActivePlayer() {
         return userChats.get(indexActivePlayer);
     }
 
-    public void addPlayer(UserChat user) {
+    public void addPlayer(DecoderUserChat user) {
         userChats.add(user);
         user.setTeam(this);
     }
@@ -58,9 +57,7 @@ public class Team {
 
     public String getCardsToString() {
         String x = "";
-        for (int i = 0; i < cards.size(); i++) {
-            x += (i + 1) + " = " + cards.get(i) + "\n";
-        }
+        for (int i = 0; i < cards.size(); i++) x += (i + 1) + " = " + cards.get(i) + "\n";
         return x;
     }
 
@@ -75,8 +72,7 @@ public class Team {
     public void resetVotes() {
         votes.clear();
         resultVotes.clear();
-        for (int i = 1; i <= cards.size(); i++)
-            votes.add("" + i);
+        for (int i = 1; i <= cards.size(); i++) votes.add("" + i);
     }
 
     public List<String> getVotes() {
@@ -101,8 +97,7 @@ public class Team {
     public String getResultVotesToString() {
         String x = "";
         for (int i = 0; i < resultVotes.size(); i++) {
-            if (i != 0)
-                x += ", ";
+            if (i != 0) x += ", ";
             x += resultVotes.get(i);
         }
         return x;
@@ -110,8 +105,7 @@ public class Team {
 
     public void incIndexActivePlayer() {
         indexActivePlayer++;
-        if (indexActivePlayer >= userChats.size())
-            indexActivePlayer = 0;
+        if (indexActivePlayer >= userChats.size()) indexActivePlayer = 0;
     }
 
     public boolean isFirstTurn() {
@@ -122,5 +116,7 @@ public class Team {
         this.firstTurn = firstTurn;
     }
 
+    public List<DecoderUserChat> getPlayers() {
+        return userChats;
+    }
 }
-
