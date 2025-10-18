@@ -1,5 +1,6 @@
 package org.mikhan808.games.decoder;
 
+import org.mikhan808.Bot;
 import org.mikhan808.core.Game;
 import org.mikhan808.core.UserChat;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -19,17 +20,13 @@ import java.util.Stack;
 
 
 public class DecoderGame extends Game {
-    public static final int MIN_COUNT_PLAYERS = 4;
     public static final int MIN_COUNT_TEAMS = 2;
     public static final int WIN_CARDS = 2;
     private static final String WORDS_RESOURCE_NAME = "Words.csv";
 
-    private final Random rand;
-    private final List<DecoderUserChat> userChats;
     private final List<Team> teams;
 
     private Stack<String> cards;
-    private int countPlayers = 1000;
     private int count_cards_on_hands = 4;
     private int countTeams = 2;
     private int indexActiveTeam = 0;
@@ -40,13 +37,16 @@ public class DecoderGame extends Game {
     private boolean waitingForOwnReady = false;
     private int waitingInterceptReady = 0;
 
-    public DecoderGame(org.mikhan808.Bot bot) {
+    public DecoderGame(Bot bot) {
         super(bot);
-        userChats = new ArrayList<>();
         teams = new ArrayList<>();
-        rand = new Random();
         cards = getCards();
         Collections.shuffle(cards, rand);
+    }
+
+    @Override
+    protected UserChat createUserChat(UserChat lobbyUserChat) {
+        return new DecoderUserChat(lobbyUserChat.getId(), lobbyUserChat.getName());
     }
 
     private boolean allTeamsNamed() {
@@ -56,7 +56,7 @@ public class DecoderGame extends Game {
     }
 
     private boolean allPlayersAssignedToTeam() {
-        for (DecoderUserChat u : userChats) {
+        for (UserChat u : players) {
             boolean hasTeam = false;
             for (Team t : teams) {
                 if (t.getPlayers().contains(u)) { hasTeam = true; break; }
@@ -66,7 +66,7 @@ public class DecoderGame extends Game {
         return true;
     }
 
-    private boolean allPlayersJoined() { return countPlayers != 1000 && userChats.size() == countPlayers; }
+    private boolean allPlayersJoined() { return countPlayers != 1000 && players.size() == countPlayers; }
 
     private boolean finishedSettings() { return allPlayersJoined() && allTeamsNamed() && allPlayersAssignedToTeam(); }
 
@@ -377,24 +377,17 @@ public class DecoderGame extends Game {
         return true;
     }
 
-    private void finishGame() {
+    public void finishGame() {
         sendTextToAll("Игра завершена");
-        for (DecoderUserChat u : userChats) u.setGame(null);
+        for (UserChat u : players) u.setGame(null);
         bot.removeGame(this);
     }
 
-    private void sendTextToAll(String text) { for (DecoderUserChat u : userChats) bot.sendText(u.getId(), text); }
-    private void copyMsgToAll(Message message) { for (DecoderUserChat u : userChats) bot.copyMessage(u.getId(), message); }
     private void forwardMsgToTeam(Message message,Team team)
     {
-        forwardMsgToTeam(message,team,false);
+        forwardMsgToList(message,team.getPlayers());
     }
-    private void forwardMsgToTeam(Message message,Team team,boolean sendToMe)
-    {
-        for (DecoderUserChat u : team.getPlayers())
-            if(sendToMe||!message.getChatId().equals(u.getId()))
-                bot.forwardMessage(u.getId(), message);
-    }
+
     private Team getActiveTeam() { return teams.get(indexActiveTeam); }
     private DecoderUserChat getActivePlayer() { return getActiveTeam().getActivePlayer(); }
     private void sendTeam(Team team, String text) { for (DecoderUserChat u : team.getPlayers()) bot.sendText(u.getId(), text); }
@@ -442,15 +435,6 @@ public class DecoderGame extends Game {
         }
         return result;
     }
-    private DecoderUserChat findUser(Long id) {
-        for (DecoderUserChat user : userChats) if (user.getId().equals(id)) return user;
-        return null;
-    }
-
-    private DecoderUserChat findUser(String name) {
-        for (DecoderUserChat user : userChats) if (name.trim().equalsIgnoreCase(user.getName())) return user;
-        return null;
-    }
 
     private Team findTeam(String name) {
         for (Team team : teams) if (team.getName() != null && name.trim().equalsIgnoreCase(team.getName())) return team;
@@ -458,10 +442,10 @@ public class DecoderGame extends Game {
     }
 
     @Override
-    public void readMsg(Update update) {
+    public void processMsg(Update update) {
         Message msg = update.getMessage();
         Long id = msg.getChatId();
-        DecoderUserChat user = findUser(id);
+        DecoderUserChat user = (DecoderUserChat) findUser(id);
         if (user != null) {
             switch (user.getStatus()) {
                 case DecoderUserChat.ENTER_NAME:
@@ -508,32 +492,18 @@ public class DecoderGame extends Game {
         }
     }
 
-    @Override
-    public boolean addPlayer(UserChat lobbyUser) {
-        if (userChats.size() < countPlayers) {
-            lobbyUser.setGame(this);
-            DecoderUserChat du = new DecoderUserChat(lobbyUser.getId(), lobbyUser.getName());
-            du.setStatus(DecoderUserChat.ENTER_NAME);
-            userChats.add(du);
-            bot.sendText(lobbyUser.getId(), "Введите имя");
-            return true;
-        } else {
-            bot.sendText(lobbyUser.getId(), "Слишком много игроков. Вернитесь в меню.");
-            return false;
-        }
-    }
 
     private void enterName(Message msg, DecoderUserChat user) {
         Long id = user.getId();
         String name = msg.getText();
-        DecoderUserChat userForName = findUser(name);
+        DecoderUserChat userForName =(DecoderUserChat) findUserByName(name);
         if (userForName == null) {
             user.setName(name);
-            if (userChats.indexOf(user) == 0) {
+            if (players.indexOf(user) == 0) {
                 bot.sendText(id, "Сколько игроков будет в игре?");
                 user.setStatus(DecoderUserChat.ENTER_COUNT_PLAYERS);
             } else {
-                if (teams.size() < countTeams && userChats.indexOf(user) >= teams.size()) {
+                if (teams.size() < countTeams && players.indexOf(user) >= teams.size()) {
                     createTeam(user);
                     bot.sendText(id, "Введите название вашей команды");
                     user.setStatus(DecoderUserChat.ENTER_NAME_TEAM);
@@ -633,8 +603,8 @@ public class DecoderGame extends Game {
 
     private void checkFinishSettingsForBeginGame(DecoderUserChat user) {
         // First, distribute any players that still do not have a team.
-        for (int i = 0; i < userChats.size(); i++) {
-            DecoderUserChat u = userChats.get(i);
+        for (int i = 0; i < players.size(); i++) {
+            DecoderUserChat u = (DecoderUserChat) players.get(i);
             boolean hasTeam = false;
             for (Team tt : teams) {
                 if (tt.getPlayers().contains(u)) { hasTeam = true; break; }
@@ -660,5 +630,10 @@ public class DecoderGame extends Game {
             }
         }
         return target;
+    }
+
+    @Override
+    public int getMinCountPlayers() {
+        return 4;
     }
 }

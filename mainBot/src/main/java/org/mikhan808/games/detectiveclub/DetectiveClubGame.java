@@ -2,6 +2,7 @@ package org.mikhan808.games.detectiveclub;
 
 import org.mikhan808.Bot;
 import org.mikhan808.core.Game;
+import org.mikhan808.core.UserChat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
@@ -18,7 +19,6 @@ import static org.mikhan808.Bot.YES;
 public class DetectiveClubGame extends Game {
     public static final int USER_SCORING = 1;
 
-    public static final int MIN_COUNT_PLAYERS = 4;
     public static final int FULL_ONLINE = 0;
     public static final int WITHOUT_CARDS = 1;
     private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
@@ -28,8 +28,6 @@ public class DetectiveClubGame extends Game {
     private final int active_player_score = 3;
     private final int guessed_score = 3;
     private final int deducted_score = 1;
-    private final Random rand;
-    private final List<DetectiveUserChat> userChats;
     private final int type_scoring = USER_SCORING;
     private final List<String> yesno;
     int enterNames = 0;
@@ -48,8 +46,6 @@ public class DetectiveClubGame extends Game {
 
     public DetectiveClubGame(Bot bot) {
         super(bot);
-        userChats = new ArrayList<>();
-        rand = new Random();
         cards = getCards();
         Collections.shuffle(cards, rand);
         yesno = new ArrayList<>();
@@ -57,38 +53,11 @@ public class DetectiveClubGame extends Game {
         yesno.add(NO);
     }
 
-    private DetectiveUserChat findUser(Long id) {
-        for (DetectiveUserChat user : userChats) {
-            if (user.getId().equals(id))
-                return user;
-        }
-        return null;
-    }
-
-    private DetectiveUserChat findUser(String name) {
-        for (DetectiveUserChat user : userChats) {
-            if (name.trim().equalsIgnoreCase(user.getName()))
-                return user;
-        }
-        return null;
-    }
-
-    public void readMsg(Update update) {
+    public void processMsg(Update update) {
         Message msg = update.getMessage();
         Long id = msg.getChatId();
-        DetectiveUserChat user = findUser(id);
+        DetectiveUserChat user = (DetectiveUserChat) findUser(id);
         if (user != null) {
-            if (msg.hasText() && msg.getText().equals("/exit")) {
-                userChats.remove(user);
-                user.setGame(null);
-                if (userChats.size() >= MIN_COUNT_PLAYERS) {
-                    sendTextToAll(user.getName() + " покинул игру");
-                    countPlayers--;
-                } else {
-                    sendTextToAll(user.getName() + " завершил игру");
-                    finishGame();
-                }
-            }
             if (user.getStatus() == DetectiveUserChat.ENTER_NAME) {
                 enterName(msg, user);
                 tryAutoStart();
@@ -145,11 +114,11 @@ public class DetectiveClubGame extends Game {
                 }
             } else if (user.getStatus() == DetectiveUserChat.VOTE_X) {
                 if (msg.getText().equals(YES)) {
-                    if (userChats.indexOf(user) != conspiratorIndex)
+                    if (players.indexOf(user) != conspiratorIndex)
                         user.getVoteUser().incVotes();
-                    user.setGuessed(userChats.indexOf(user.getVoteUser()) == conspiratorIndex);
+                    user.setGuessed(players.indexOf(user.getVoteUser()) == conspiratorIndex);
                     countVotePlayers++;
-                    if (countVotePlayers < userChats.size() - 1) {
+                    if (countVotePlayers < players.size() - 1) {
                         user.setStatus(DetectiveUserChat.OK);
                         bot.sendText(id, "Ожидайте других игроков");
                     } else {
@@ -159,7 +128,7 @@ public class DetectiveClubGame extends Game {
                         String usersScore = buildListUsersScore();
                         sendTextToAll(usersScore);
                         boolean end = false;
-                        if (indexActivePlayer < userChats.size() - 1)
+                        if (indexActivePlayer < players.size() - 1)
                             indexActivePlayer++;
                         else if (countRounds == 1) {
                             finishGame();
@@ -189,9 +158,9 @@ public class DetectiveClubGame extends Game {
         // если параметры не заданы (значение по умолчанию) и собралось >= MIN_COUNT_PLAYERS
         if (countPlayers == 1000) {
             int named = 0;
-            for (DetectiveUserChat u : userChats) if (u.getName() != null && !u.getName().trim().isEmpty()) named++;
-            if (userChats.size() >= MIN_COUNT_PLAYERS && named == userChats.size()) {
-                countPlayers = userChats.size();
+            for (UserChat u : players) if (u.getName() != null && !u.getName().trim().isEmpty()) named++;
+            if (players.size() >= getMinCountPlayers() && named == players.size()) {
+                countPlayers = players.size();
                 type_game = FULL_ONLINE;
                 // countRounds и count_cards_on_hands уже имеют дефолты
                 finishSetting = true;
@@ -200,41 +169,21 @@ public class DetectiveClubGame extends Game {
         }
     }
 
-    private void finishGame() {
+    public void finishGame() {
         sendTextToAll("Конец игры");
-        for (DetectiveUserChat user : userChats) {
+        for (UserChat user : players) {
             user.setGame(null);
         }
         bot.removeGame(this);
     }
 
-    public boolean addPlayer(org.mikhan808.core.UserChat lobbyUser) {
-        if (userChats.size() < countPlayers) {
-            lobbyUser.setGame(this);
-            // Создаем игрового пользователя и переводим его в режим ввода имени
-            DetectiveUserChat du = new DetectiveUserChat(lobbyUser.getId(), lobbyUser.getName());
-            du.setStatus(DetectiveUserChat.ENTER_NAME);
-            userChats.add(du);
-            // Сообщения для игрока
-            bot.sendText(lobbyUser.getId(), "Добро пожаловать");
-            bot.sendText(lobbyUser.getId(), "Пожалуйста введите своё имя");
-            return true;
-        } else {
-            bot.sendText(lobbyUser.getId(), "Количество игроков уже собрано, попробуйте присоединиться к другой игре");
-        }
-        return false;
+    @Override
+    public int getMinCountPlayers() {
+        return 4;
     }
-
-    private void sendTextToAll(String text) {
-        for (DetectiveUserChat user : userChats) {
-            bot.sendText(user.getId(), text);
-        }
-    }
-
-    private void forwardMsgToAll(Message message) {
-        for (DetectiveUserChat user : userChats) {
-            bot.forwardMessage(user.getId(), message);
-        }
+    @Override
+    protected UserChat createUserChat(UserChat lobbyUserChat) {
+        return new DetectiveUserChat(lobbyUserChat.getId(),lobbyUserChat.getName());
     }
 
     private void calculateScores() {
@@ -248,15 +197,16 @@ public class DetectiveClubGame extends Game {
             getConspirator().setCurrentRoundScore(conspirator_score);
             getActivePlayer().setCurrentRoundScore(active_player_score);
         }
-        for (int i = 0; i < userChats.size(); i++) {
+        for (int i = 0; i < players.size(); i++) {
+            DetectiveUserChat u = (DetectiveUserChat) players.get(i);
             if (i != conspiratorIndex && i != indexActivePlayer) {
-                if (userChats.get(i).isGuessed())
-                    userChats.get(i).setCurrentRoundScore(guessed_score);
+                if (u.isGuessed())
+                    u.setCurrentRoundScore(guessed_score);
                 else
-                    userChats.get(i).setCurrentRoundScore(0);
-                userChats.get(i).setDeductedPoints(userChats.get(i).getVotes() * deducted_score);
+                    u.setCurrentRoundScore(0);
+                u.setDeductedPoints(u.getVotes() * deducted_score);
             } else {
-                userChats.get(i).setDeductedPoints(0);
+               u.setDeductedPoints(0);
             }
         }
     }
@@ -273,8 +223,8 @@ public class DetectiveClubGame extends Game {
     }
 
     private DetectiveUserChat[] sortedUsers() {
-        DetectiveUserChat[] usersScore = new DetectiveUserChat[userChats.size()];
-        usersScore = userChats.toArray(usersScore);
+        DetectiveUserChat[] usersScore = new DetectiveUserChat[players.size()];
+        usersScore = players.toArray(usersScore);
         for (int i = 0; i < usersScore.length; i++)
             for (int g = 0; g < usersScore.length - 1; g++) {
                 if (usersScore[g + 1].getScore() > usersScore[g].getScore()) {
@@ -289,7 +239,8 @@ public class DetectiveClubGame extends Game {
     private void nextRound() {
         DetectiveUserChat activePlayer = getActivePlayer();
         activePlayer.setStatus(DetectiveUserChat.ACTIVE_PLAYER);
-        for (DetectiveUserChat player : userChats) {
+        for (UserChat u : players) {
+            DetectiveUserChat player = (DetectiveUserChat) u;
             player.resetTable();
             for (int i = 0; i < count_card_on_round; i++)
                 player.addCard(getNextCard());
@@ -315,39 +266,41 @@ public class DetectiveClubGame extends Game {
     private void sendCard(DetectiveUserChat user) {
         StringBuilder sb = new StringBuilder();
         user.moveCardToTable(card);
-        for (int i = indexActivePlayer, g = 0; g < userChats.size(); g++) {
-            if (userChats.get(i).getTable().size() > 0) {
-                sb.append(userChats.get(i).getName());
+        for (int i = indexActivePlayer, g = 0; g < players.size(); g++) {
+            DetectiveUserChat du = (DetectiveUserChat) players.get(i);
+            if (du.getTable().size() > 0) {
+                sb.append(du.getName());
                 sb.append(" (");
-                for (int x = 0; x < userChats.get(i).getTable().size(); x++) {
+                for (int x = 0; x < du.getTable().size(); x++) {
                     if (x != 0)
                         sb.append(", ");
-                    sb.append(userChats.get(i).getTable().get(x));
+                    sb.append(du.getTable().get(x));
                 }
                 sb.append(")\n");
             }
             i++;
-            if (i >= userChats.size())
+            if (i >= players.size())
                 i = 0;
         }
         bot.sendKeyBoard(user.getId(), "Готово", user.getCards());
         sendTextToAll(sb.toString());
-        int ind = userChats.indexOf(user);
+        int ind = players.indexOf(user);
         ind++;
-        if (ind >= userChats.size())
+        if (ind >= players.size())
             ind = 0;
         user.setStatus(DetectiveUserChat.OK);
-        userChats.get(ind).setStatus(DetectiveUserChat.ACTIVE_PLAYER_X);
-        if (userChats.get(ind).getTable().size() >= count_card_on_round) {
+        DetectiveUserChat du = (DetectiveUserChat) players.get(ind);
+        du.setStatus(DetectiveUserChat.ACTIVE_PLAYER_X);
+        if (du.getTable().size() >= count_card_on_round) {
             runVote();
         } else {
-            sendTextToAll(userChats.get(ind).getName() + " кладет карточку");
-            bot.sendKeyBoard(userChats.get(ind).getId(), "Выберите слово", userChats.get(ind).getCards());
+            sendTextToAll(du.getName() + " кладет карточку");
+            bot.sendKeyBoard(du.getId(), "Выберите слово", du.getCards());
         }
     }
 
     private void checkVote(Message msg, DetectiveUserChat user) {
-        DetectiveUserChat voteUser = findUser(msg.getText());
+        DetectiveUserChat voteUser = (DetectiveUserChat) findUserByName(msg.getText());
         if (voteUser == null)
             bot.sendText(user.getId(), "Пожалуйста выберите игрока с помощью кнопок");
         else {
@@ -371,11 +324,12 @@ public class DetectiveClubGame extends Game {
 
     private void sendAssociate(Message msg, DetectiveUserChat user) {
         associate = msg;
-        conspiratorIndex = rand.nextInt(userChats.size());
+        conspiratorIndex = rand.nextInt(players.size());
         while (conspiratorIndex == indexActivePlayer)
-            conspiratorIndex = rand.nextInt(userChats.size());
+            conspiratorIndex = rand.nextInt(players.size());
         getConspirator().setStatus(DetectiveUserChat.CONSPIRATOR);
-        for (DetectiveUserChat player : userChats) {
+        for (UserChat u : players) {
+            DetectiveUserChat player = (DetectiveUserChat) u;
             if (player.getStatus() == DetectiveUserChat.CONSPIRATOR)
                 bot.sendText(player.getId(), "Вы конспиратор");
             else bot.forwardMessage(player.getId(), associate);
@@ -399,12 +353,12 @@ public class DetectiveClubGame extends Game {
         if (msg.getText() != null)
             try {
                 int x = Integer.parseInt(msg.getText().trim());
-                if (x >= MIN_COUNT_PLAYERS) {
+                if (x >= getMinCountPlayers()) {
                     countPlayers = x;
                     user.setStatus(DetectiveUserChat.ENTER_TYPE_GAME);
                     bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
                 } else {
-                    bot.sendText(user.getId(), "Количество игроков не может быть меньше " + MIN_COUNT_PLAYERS);
+                    bot.sendText(user.getId(), "Количество игроков не может быть меньше " + getMinCountPlayers());
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -456,11 +410,11 @@ public class DetectiveClubGame extends Game {
     private void enterName(Message msg, DetectiveUserChat user) {
         Long id = user.getId();
         String name = msg.getText();
-        DetectiveUserChat userForName = findUser(name);
+        DetectiveUserChat userForName = (DetectiveUserChat) findUserByName(name);
         if (userForName == null || userForName == user) {
             user.setName(name);
             enterNames++;
-            if (userChats.indexOf(user) == 0) {
+            if (players.indexOf(user) == 0) {
                 user.setStatus(DetectiveUserChat.ENTER_COUNT_PLAYERS);
                 bot.sendText(id, "Введите количество игроков");
             } else {
@@ -476,7 +430,8 @@ public class DetectiveClubGame extends Game {
 
     private void beginGame() {
         sendTextToAll("Начинаем!");
-        for (DetectiveUserChat player : userChats) {
+        for (UserChat u: players) {
+            DetectiveUserChat player = (DetectiveUserChat)u;
             player.getCards().clear();
             player.setScore(0);
             for (int i = 0; i < count_cards_on_hands - count_card_on_round; i++) {
@@ -487,18 +442,18 @@ public class DetectiveClubGame extends Game {
     }
 
     private DetectiveUserChat getConspirator() {
-        return userChats.get(conspiratorIndex);
+        return(DetectiveUserChat) players.get(conspiratorIndex);
     }
 
     private DetectiveUserChat getActivePlayer() {
-        return userChats.get(indexActivePlayer);
+        return(DetectiveUserChat) players.get(indexActivePlayer);
     }
 
     private List<String> calculateButtonsForVote(DetectiveUserChat user) {
         List<String> buttons = new ArrayList<>();
-        for (int i = 0; i < userChats.size(); i++) {
-            if (i != indexActivePlayer && !userChats.get(i).getId().equals(user.getId())) {
-                buttons.add(userChats.get(i).getName());
+        for (int i = 0; i < players.size(); i++) {
+            if (i != indexActivePlayer && !players.get(i).getId().equals(user.getId())) {
+                buttons.add(players.get(i).getName());
             }
         }
         return buttons;
@@ -507,8 +462,9 @@ public class DetectiveClubGame extends Game {
     private void runVote() {
         countVotePlayers = 0;
         sendTextToAll("Ассоциация:");
-        forwardMsgToAll(associate);
-        for (DetectiveUserChat player : userChats) {
+        copyMsgToAll(associate);
+        for (UserChat u : players) {
+            DetectiveUserChat player=(DetectiveUserChat)u;
             player.resetVotes();
             player.setGuessed(false);
             if (player.getStatus() == DetectiveUserChat.ACTIVE_PLAYER_X) {

@@ -3,7 +3,6 @@ package org.mikhan808.games.resistance;
 import org.mikhan808.core.UserChat;
 
 public class ResistanceUserChat extends UserChat {
-    public static final int OK = 2;
     public static final int TEAM_SELECTION = 20;
     public static final int TEAM_VOTE = 21;
     public static final int MISSION_VOTE = 22;

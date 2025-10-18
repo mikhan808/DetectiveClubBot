@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DetectiveUserChat extends UserChat {
-    public static final int ENTER_NAME = 1;
-    public static final int OK = 2;
     public static final int ACTIVE_PLAYER = 3;
     public static final int ENTER_COUNT_PLAYERS = 4;
     public static final int CONSPIRATOR = 5;

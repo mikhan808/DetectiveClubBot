@@ -3,8 +3,6 @@ package org.mikhan808.games.decoder;
 import org.mikhan808.core.UserChat;
 
 public class DecoderUserChat extends UserChat {
-    public static final int ENTER_NAME = 1;
-    public static final int OK = 2;
     public static final int ACTIVE_PLAYER = 3;
     public static final int ENTER_COUNT_PLAYERS = 4;
     public static final int DISCUSSION = 5;
