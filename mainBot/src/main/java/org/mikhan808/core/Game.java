@@ -41,6 +41,7 @@ public abstract class Game implements GameSession {
             if (msg.hasText() && msg.getText().equals("/exit")) {
                 players.remove(user);
                 user.setGame(null);
+                bot.findUser(user.getId()).setGame(null);
                 if (players.size() >= getMinCountPlayers()) {
                     sendTextToAll(user.getName() + " покинул игру");
                     countPlayers--;

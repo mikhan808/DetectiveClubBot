@@ -12,7 +12,7 @@ import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
 public class ResistanceGame extends Game {
-
+        public static final String NAME="Шпион";
         // UI strings
         private static final String START_GAME = "Начать игру";
         private static final String DONE = "Готово";
@@ -191,7 +191,7 @@ public class ResistanceGame extends Game {
 
         private void sendLobbyState() {
             StringBuilder sb = new StringBuilder();
-            sb.append("Лобби (игроков: ").append(players.size()).append(")\n");
+            sb.append("Присоединилось (игроков: ").append(players.size()).append(")\n");
             for (UserChat p : players) {
                 sb.append("- ").append(p.getName() == null ? "(без имени)" : p.getName()).append('\n');
             }

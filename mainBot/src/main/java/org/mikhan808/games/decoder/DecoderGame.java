@@ -20,6 +20,7 @@ import java.util.Stack;
 
 
 public class DecoderGame extends Game {
+    public static final String NAME="Декодер";
     public static final int MIN_COUNT_TEAMS = 2;
     public static final int WIN_CARDS = 2;
     private static final String WORDS_RESOURCE_NAME = "Words.csv";

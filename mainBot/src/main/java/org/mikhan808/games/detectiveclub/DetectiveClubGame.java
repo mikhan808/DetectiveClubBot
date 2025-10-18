@@ -17,6 +17,7 @@ import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
 public class DetectiveClubGame extends Game {
+    public static final String NAME="Ассоциации";
     public static final int USER_SCORING = 1;
 
     public static final int FULL_ONLINE = 0;

@@ -43,9 +43,9 @@ public class Bot extends TelegramLongPollingBot {
         createOrJoinButtons.add(CREATE_GAME);
         createOrJoinButtons.add(JOIN_GAME);
         gameTypeButtons = new ArrayList<>();
-        gameTypeButtons.add("Detective Club");
-        gameTypeButtons.add("Decoder");
-        gameTypeButtons.add("Сопротивление");
+        gameTypeButtons.add(DetectiveClubGame.NAME);
+        gameTypeButtons.add(DecoderGame.NAME);
+        gameTypeButtons.add(ResistanceGame.NAME);
         gameTypeButtons.add(JOIN_GAME);
     }
 
@@ -120,11 +120,11 @@ public class Bot extends TelegramLongPollingBot {
                             }
                             String choice = msg.getText();
                             Game game = null;
-                            if ("Detective Club".equals(choice)) {
+                            if (DetectiveClubGame.NAME.equals(choice)) {
                                 game = new DetectiveClubGame(this);
-                            } else if ("Decoder".equals(choice)) {
+                            } else if (DecoderGame.NAME.equals(choice)) {
                                 game = new DecoderGame(this);
-                            } else if ("Сопротивление".equals(choice) || "Resistance".equals(choice)) {
+                            } else if (ResistanceGame.NAME.equals(choice)) {
                                 game = new ResistanceGame(this);
                             }
                             if (game != null) {
