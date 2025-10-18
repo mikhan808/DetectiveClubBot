@@ -8,6 +8,7 @@ import org.mikhan808.games.detectiveclub.DetectiveClubGame;
 import org.mikhan808.games.resistance.ResistanceGame;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.CopyMessage;
+import org.telegram.telegrambots.meta.api.methods.ForwardMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -45,6 +46,7 @@ public class Bot extends TelegramLongPollingBot {
         gameTypeButtons.add("Detective Club");
         gameTypeButtons.add("Decoder");
         gameTypeButtons.add("Сопротивление");
+        gameTypeButtons.add(JOIN_GAME);
     }
 
     @Override
@@ -89,6 +91,11 @@ public class Bot extends TelegramLongPollingBot {
             if (user != null) {
                 if (user.getGame() == null) {
                     if (user.getStatus() == UserChat.JOIN_GAME) {
+                        if (msg.getText().equals(CREATE_GAME)) {
+                            user.setStatus(UserChat.SELECT_GAME_TYPE);
+                            sendKeyBoard(id, "Выберите игру", gameTypeButtons);
+                            return;
+                        }
                         try {
                             int x = Integer.parseInt(msg.getText().trim());
                             Game game = findGame(x);
@@ -106,6 +113,11 @@ public class Bot extends TelegramLongPollingBot {
                             user.setStatus(UserChat.SELECT_GAME_TYPE);
                             sendKeyBoard(id, "Выберите игру", gameTypeButtons);
                         } else if (user.getStatus() == UserChat.SELECT_GAME_TYPE) {
+                            if (msg.getText().equals(JOIN_GAME)) {
+                                user.setStatus(UserChat.JOIN_GAME);
+                                sendText(id, "Введите ID игры");
+                                return;
+                            }
                             String choice = msg.getText();
                             Game game = null;
                             if ("Detective Club".equals(choice)) {
@@ -150,6 +162,18 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public void forwardMessage(Long chatId, Message msg) {
+        ForwardMessage copyMessage = new ForwardMessage();
+        copyMessage.setMessageId(msg.getMessageId());
+        copyMessage.setChatId(chatId.toString());
+        copyMessage.setFromChatId(msg.getChatId().toString());
+        try {
+            execute(copyMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void copyMessage(Long chatId, Message msg) {
         CopyMessage copyMessage = new CopyMessage();
         copyMessage.setMessageId(msg.getMessageId());
         copyMessage.setChatId(chatId.toString());
@@ -197,4 +221,3 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 }
-

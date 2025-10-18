@@ -9,24 +9,22 @@ import java.util.Map;
 
 public class Team {
     private final List<String> cards;
-    private final Map<String, List<Message>> associates;
-    private final Map<String, Message> currentAssociates;
-    private final List<String> resultVotes;
-    private final List<String> votes;
-    List<DecoderUserChat> userChats;
-    int winCards = 0;
-    int loseCards = 0;
+    private final Map<String, List<Message>> associatesHistory;
+    private final Map<Integer, Message> currentAssociates;
+    private final List<DecoderUserChat> userChats;
+    private int winCards = 0;
+    private int loseCards = 0;
     private String name;
     private int indexActivePlayer = 0;
     private boolean firstTurn = true;
+    private int[] ownGuess;
+    private int[] interceptGuess;
 
     public Team() {
         userChats = new ArrayList<>();
         cards = new ArrayList<>();
-        associates = new HashMap<>();
+        associatesHistory = new HashMap<>();
         currentAssociates = new HashMap<>();
-        votes = new ArrayList<>();
-        resultVotes = new ArrayList<>();
     }
 
     public String getName() {
@@ -48,7 +46,7 @@ public class Team {
 
     public void addCard(String card) {
         cards.add(card);
-        associates.put(card, new ArrayList<>());
+        associatesHistory.put(card, new ArrayList<>());
     }
 
     public List<String> getCards() {
@@ -61,47 +59,50 @@ public class Team {
         return x;
     }
 
-    public Map<String, List<Message>> getAssociates() {
-        return associates;
+    public Map<String, List<Message>> getAssociatesHistory() {
+        return associatesHistory;
     }
 
-    public Map<String, Message> getCurrentAssociates() {
+    public Map<Integer, Message> getCurrentAssociates() {
         return currentAssociates;
     }
 
-    public void resetVotes() {
-        votes.clear();
-        resultVotes.clear();
-        for (int i = 1; i <= cards.size(); i++) votes.add("" + i);
+    public void resetRoundState() {
+        ownGuess = null;
+        interceptGuess = null;
     }
 
-    public List<String> getVotes() {
-        return votes;
+    public boolean hasOwnGuess() { return ownGuess != null; }
+
+    public boolean hasInterceptGuess() { return interceptGuess != null; }
+
+    public void setOwnGuess(int[] guess) {
+        this.ownGuess = guess;
     }
 
-    public boolean removeVote(String vote) {
-        for (int i = 0; i < votes.size(); i++) {
-            if (votes.get(i).equals(vote)) {
-                resultVotes.add(votes.get(i));
-                votes.remove(i);
-                return true;
-            }
-        }
-        return false;
+    public int[] getOwnGuess() {
+        return ownGuess;
     }
 
-    public List<String> getResultVotes() {
-        return resultVotes;
+    public void setInterceptGuess(int[] guess) {
+        this.interceptGuess = guess;
     }
 
-    public String getResultVotesToString() {
-        String x = "";
-        for (int i = 0; i < resultVotes.size(); i++) {
-            if (i != 0) x += ", ";
-            x += resultVotes.get(i);
-        }
-        return x;
+    public int[] getInterceptGuess() {
+        return interceptGuess;
     }
+
+    public void incrementWinCards() {
+        winCards++;
+    }
+
+    public void incrementLoseCards() {
+        loseCards++;
+    }
+
+    public int getWinCards() { return winCards; }
+
+    public int getLoseCards() { return loseCards; }
 
     public void incIndexActivePlayer() {
         indexActivePlayer++;

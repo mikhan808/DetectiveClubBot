@@ -91,14 +91,19 @@ public class DetectiveClubGame extends Game {
             }
             if (user.getStatus() == DetectiveUserChat.ENTER_NAME) {
                 enterName(msg, user);
+                tryAutoStart();
             } else if (user.getStatus() == DetectiveUserChat.ENTER_COUNT_PLAYERS) {
                 enterCountPlayers(msg, user);
+                tryAutoStart();
             } else if (user.getStatus() == DetectiveUserChat.ENTER_TYPE_GAME) {
                 enterTypeGame(msg, user);
+                tryAutoStart();
             } else if (user.getStatus() == DetectiveUserChat.ENTER_COUNT_ROUNDS) {
                 enterCountRounds(msg, user);
+                tryAutoStart();
             } else if (user.getStatus() == DetectiveUserChat.ENTER_COUNT_CARDS) {
                 enterCountCards(msg, user);
+                tryAutoStart();
             } else if (user.getStatus() == DetectiveUserChat.OK) {
                 bot.sendText(id, "Ожидаем, потерпите)");
             } else if (user.getStatus() == DetectiveUserChat.ACTIVE_PLAYER) {
@@ -178,6 +183,23 @@ public class DetectiveClubGame extends Game {
         }
     }
 
+    // Автостарт игры с настройками по умолчанию, если ведущий не задал параметры
+    private void tryAutoStart() {
+        if (finishSetting) return;
+        // если параметры не заданы (значение по умолчанию) и собралось >= MIN_COUNT_PLAYERS
+        if (countPlayers == 1000) {
+            int named = 0;
+            for (DetectiveUserChat u : userChats) if (u.getName() != null && !u.getName().trim().isEmpty()) named++;
+            if (userChats.size() >= MIN_COUNT_PLAYERS && named == userChats.size()) {
+                countPlayers = userChats.size();
+                type_game = FULL_ONLINE;
+                // countRounds и count_cards_on_hands уже имеют дефолты
+                finishSetting = true;
+                beginGame();
+            }
+        }
+    }
+
     private void finishGame() {
         sendTextToAll("Конец игры");
         for (DetectiveUserChat user : userChats) {
@@ -188,11 +210,14 @@ public class DetectiveClubGame extends Game {
 
     public boolean addPlayer(org.mikhan808.core.UserChat lobbyUser) {
         if (userChats.size() < countPlayers) {
-            lobbyUser.setStatus(DetectiveUserChat.ENTER_NAME);
             lobbyUser.setGame(this);
+            // Создаем игрового пользователя и переводим его в режим ввода имени
+            DetectiveUserChat du = new DetectiveUserChat(lobbyUser.getId(), lobbyUser.getName());
+            du.setStatus(DetectiveUserChat.ENTER_NAME);
+            userChats.add(du);
+            // Сообщения для игрока
             bot.sendText(lobbyUser.getId(), "Добро пожаловать");
             bot.sendText(lobbyUser.getId(), "Пожалуйста введите своё имя");
-            userChats.add(new DetectiveUserChat(lobbyUser.getId(), lobbyUser.getName()));
             return true;
         } else {
             bot.sendText(lobbyUser.getId(), "Количество игроков уже собрано, попробуйте присоединиться к другой игре");
@@ -518,4 +543,3 @@ public class DetectiveClubGame extends Game {
         return result;
     }
 }
-
