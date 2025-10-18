@@ -4,6 +4,8 @@ public abstract class UserChat {
     // Base statuses for lobby/menu
     public static final int ENTER_NAME = 1;
     public static final int OK = 2;
+    public static final int ACTIVE_PLAYER = 3;
+    public static final int ENTER_COUNT_PLAYERS = 4;
     public static final int JOIN_GAME = 11;
     public static final int SELECT_GAME_TYPE = 99;
     private Long id;

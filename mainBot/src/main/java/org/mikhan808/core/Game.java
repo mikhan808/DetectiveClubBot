@@ -1,7 +1,8 @@
 package org.mikhan808.core;
 
 import org.mikhan808.Bot;
-import org.mikhan808.games.detectiveclub.DetectiveUserChat;
+import org.mikhan808.games.cardgames.decoder.DecoderUserChat;
+import org.mikhan808.games.cardgames.detectiveclub.DetectiveUserChat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
@@ -15,6 +16,8 @@ public abstract class Game implements GameSession {
     protected List<UserChat> players;
     protected Random rand;
     protected int countPlayers = 1000;
+    protected int enterNames = 0;
+    protected boolean finishSetting = false;
 
     protected Game(Bot bot) {
         this.bot = bot;
@@ -50,10 +53,24 @@ public abstract class Game implements GameSession {
                     finishGame();
                 }
             }
-            else {
+            if (user.getStatus() == UserChat.ENTER_NAME) {
+                enterName(msg, user);
+            }else if (user.getStatus() == DetectiveUserChat.ENTER_COUNT_PLAYERS) {
+                enterCountPlayers(msg, user);
+            } else {
                 processMsg(update);
             }
         }
+    }
+
+    protected void finishGame()
+    {
+        sendTextToAll("Конец игры");
+        for (UserChat user : players) {
+            user.setGame(null);
+            bot.findUser(user.getId()).setGame(null);
+        }
+        bot.removeGame(this);
     }
 
     public abstract void processMsg(Update update);
@@ -95,7 +112,9 @@ public abstract class Game implements GameSession {
     }
 
     protected abstract UserChat createUserChat(UserChat lobbyUserChat);
-
+    protected abstract void afterEnterCountPlayers(UserChat user);
+    protected abstract void beginGame();
+    public abstract int getMinCountPlayers();
     @Override
     public boolean addPlayer(UserChat lobbyUser) {
         if (players.size() < countPlayers) {
@@ -111,7 +130,54 @@ public abstract class Game implements GameSession {
         }
     }
 
-    public abstract int getMinCountPlayers();
-    public abstract void finishGame();
+    protected void checkAfterEnterName(UserChat user)
+    {
+        Long id = user.getId();
+        if (players.indexOf(user) == 0) {
+            user.setStatus(UserChat.ENTER_COUNT_PLAYERS);
+            bot.sendText(id, "Введите количество игроков");
+        } else {
+            defaultAfterEnterName(user);
+        }
+    }
+
+    protected void defaultAfterEnterName(UserChat user)
+    {
+        user.setStatus(UserChat.OK);
+        if (enterNames < countPlayers || !finishSetting)
+            bot.sendText(user.getId(), "Ожидаем подключения всех игроков");
+        else {
+            beginGame();
+        }
+    }
+
+    protected void enterName(Message msg, UserChat user) {
+        Long id = user.getId();
+        String name = msg.getText();
+        UserChat userForName =  findUserByName(name);
+        if (userForName == null || userForName == user) {
+            user.setName(name);
+            enterNames++;
+            checkAfterEnterName(user);
+        } else bot.sendText(id, "Пожалуйста введите другое имя, данное имя уже занято");
+    }
+
+    private void enterCountPlayers(Message msg, UserChat user) {
+        if (msg.getText() != null)
+            try {
+                int x = Integer.parseInt(msg.getText().trim());
+                if (x >= getMinCountPlayers()) {
+                    countPlayers = x;
+                    afterEnterCountPlayers(user);
+                } else {
+                    bot.sendText(user.getId(), "Количество игроков не может быть меньше " + getMinCountPlayers());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
+            }
+    }
+
+
 }
 

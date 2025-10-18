@@ -3,8 +3,9 @@ package org.mikhan808;
 import org.mikhan808.core.Game;
 import org.mikhan808.core.LobbyUserChat;
 import org.mikhan808.core.UserChat;
-import org.mikhan808.games.decoder.DecoderGame;
-import org.mikhan808.games.detectiveclub.DetectiveClubGame;
+import org.mikhan808.games.cardgames.decoder.DecoderGame;
+import org.mikhan808.games.cardgames.detectiveclub.DetectiveClubGame;
+import org.mikhan808.games.cardgames.dixit.DixitGame;
 import org.mikhan808.games.resistance.ResistanceGame;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.CopyMessage;
@@ -46,6 +47,7 @@ public class Bot extends TelegramLongPollingBot {
         gameTypeButtons.add(DetectiveClubGame.NAME);
         gameTypeButtons.add(DecoderGame.NAME);
         gameTypeButtons.add(ResistanceGame.NAME);
+        gameTypeButtons.add(DixitGame.NAME);
         gameTypeButtons.add(JOIN_GAME);
     }
 
@@ -126,6 +128,8 @@ public class Bot extends TelegramLongPollingBot {
                                 game = new DecoderGame(this);
                             } else if (ResistanceGame.NAME.equals(choice)) {
                                 game = new ResistanceGame(this);
+                            } else if (DixitGame.NAME.equals(choice)) {
+                                game = new DixitGame(this);
                             }
                             if (game != null) {
                                 games.add(game);

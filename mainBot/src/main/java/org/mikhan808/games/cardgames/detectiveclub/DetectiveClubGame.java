@@ -1,57 +1,34 @@
-package org.mikhan808.games.detectiveclub;
+package org.mikhan808.games.cardgames.detectiveclub;
 
 import org.mikhan808.Bot;
-import org.mikhan808.core.Game;
 import org.mikhan808.core.UserChat;
+import org.mikhan808.games.cardgames.AbstractAssociateCardGame;
+import org.mikhan808.games.cardgames.AbstractCardsGame;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.mikhan808.Bot.NO;
 import static org.mikhan808.Bot.YES;
 
-public class DetectiveClubGame extends Game {
-    public static final String NAME="Ассоциации";
+public class DetectiveClubGame extends AbstractAssociateCardGame {
+    public static final String NAME="Конспиратор";
     public static final int USER_SCORING = 1;
 
     public static final int FULL_ONLINE = 0;
     public static final int WITHOUT_CARDS = 1;
     private static final String BEGIN_DISCUSSION = "Перейти к обсуждению";
-    private static final String WORDS_RESOURCE_NAME = "Words.csv";
-    private final int count_card_on_round = 2;
     private final int conspirator_score = 3;
-    private final int active_player_score = 3;
-    private final int guessed_score = 3;
     private final int deducted_score = 1;
     private final int type_scoring = USER_SCORING;
-    private final List<String> yesno;
-    int enterNames = 0;
-    boolean finishSetting = false;
-
-    private Stack<String> cards;
-    private int countPlayers = 1000;
-    private int count_cards_on_hands = 12;
-    private int countVotePlayers = 0;
-    private int indexActivePlayer = 0;
-    private int countRounds = 2;
-    private Message associate;
     private int conspiratorIndex = 0;
     private String card;
     private int type_game = FULL_ONLINE;
 
     public DetectiveClubGame(Bot bot) {
         super(bot);
-        cards = getCards();
-        Collections.shuffle(cards, rand);
-        yesno = new ArrayList<>();
-        yesno.add(YES);
-        yesno.add(NO);
+        count_card_on_round = 2;
     }
 
     public void processMsg(Update update) {
@@ -59,13 +36,7 @@ public class DetectiveClubGame extends Game {
         Long id = msg.getChatId();
         DetectiveUserChat user = (DetectiveUserChat) findUser(id);
         if (user != null) {
-            if (user.getStatus() == DetectiveUserChat.ENTER_NAME) {
-                enterName(msg, user);
-                tryAutoStart();
-            } else if (user.getStatus() == DetectiveUserChat.ENTER_COUNT_PLAYERS) {
-                enterCountPlayers(msg, user);
-                tryAutoStart();
-            } else if (user.getStatus() == DetectiveUserChat.ENTER_TYPE_GAME) {
+            if (user.getStatus() == DetectiveUserChat.ENTER_TYPE_GAME) {
                 enterTypeGame(msg, user);
                 tryAutoStart();
             } else if (user.getStatus() == DetectiveUserChat.ENTER_COUNT_ROUNDS) {
@@ -170,14 +141,6 @@ public class DetectiveClubGame extends Game {
         }
     }
 
-    public void finishGame() {
-        sendTextToAll("Конец игры");
-        for (UserChat user : players) {
-            user.setGame(null);
-        }
-        bot.removeGame(this);
-    }
-
     @Override
     public int getMinCountPlayers() {
         return 4;
@@ -254,14 +217,6 @@ public class DetectiveClubGame extends Game {
     private void requestConfirmation(DetectiveUserChat user, int status) {
         user.setStatus(status);
         bot.sendKeyBoard(user.getId(), "Вы уверены?", yesno);
-    }
-
-    private String getNextCard() {
-        if (cards.empty()) {
-            cards = getCards();
-            Collections.shuffle(cards, rand);
-        }
-        return cards.pop();
     }
 
     private void sendCard(DetectiveUserChat user) {
@@ -350,21 +305,10 @@ public class DetectiveClubGame extends Game {
         bot.sendKeyBoard(user.getId(), "Нажмите на кнопку, когда все положат по 2 карточки", buttons);
     }
 
-    private void enterCountPlayers(Message msg, DetectiveUserChat user) {
-        if (msg.getText() != null)
-            try {
-                int x = Integer.parseInt(msg.getText().trim());
-                if (x >= getMinCountPlayers()) {
-                    countPlayers = x;
-                    user.setStatus(DetectiveUserChat.ENTER_TYPE_GAME);
-                    bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
-                } else {
-                    bot.sendText(user.getId(), "Количество игроков не может быть меньше " + getMinCountPlayers());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                bot.sendText(user.getId(), "Что-то не так. Пожалуйста проверьте данные и повторите ввод");
-            }
+    protected void afterEnterCountPlayers(UserChat user)
+    {
+        user.setStatus(DetectiveUserChat.ENTER_TYPE_GAME);
+        bot.sendKeyBoard(user.getId(), "Использовать онлайн карточки?", yesno);
     }
 
     private void enterTypeGame(Message msg, DetectiveUserChat user) {
@@ -408,28 +352,7 @@ public class DetectiveClubGame extends Game {
             }
     }
 
-    private void enterName(Message msg, DetectiveUserChat user) {
-        Long id = user.getId();
-        String name = msg.getText();
-        DetectiveUserChat userForName = (DetectiveUserChat) findUserByName(name);
-        if (userForName == null || userForName == user) {
-            user.setName(name);
-            enterNames++;
-            if (players.indexOf(user) == 0) {
-                user.setStatus(DetectiveUserChat.ENTER_COUNT_PLAYERS);
-                bot.sendText(id, "Введите количество игроков");
-            } else {
-                user.setStatus(DetectiveUserChat.OK);
-                if (enterNames < countPlayers || !finishSetting)
-                    bot.sendText(id, "Ожидаем подключения всех игроков");
-                else {
-                    beginGame();
-                }
-            }
-        } else bot.sendText(id, "Пожалуйста введите другое имя, данное имя уже занято");
-    }
-
-    private void beginGame() {
+    protected void beginGame() {
         sendTextToAll("Начинаем!");
         for (UserChat u: players) {
             DetectiveUserChat player = (DetectiveUserChat)u;
@@ -476,27 +399,5 @@ public class DetectiveClubGame extends Game {
                 bot.sendKeyBoard(player.getId(), "Рассскажите почему Вы положили именно эти карточки, выслушайте других участников и проголосуйте за того, кто по вашему мнению является конспиратором", calculateButtonsForVote(player));
             }
         }
-    }
-
-    Stack<String> getCards() {
-        Stack<String> result = new Stack<>();
-        try {
-            InputStream is = DetectiveClubGame.class.getClassLoader().getResourceAsStream(WORDS_RESOURCE_NAME);
-            if (is == null) {
-                throw new IOException("Resource not found: " + WORDS_RESOURCE_NAME);
-            }
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-            String line = reader.readLine();
-            while (line != null) {
-                line = line.trim();
-                if (!line.isEmpty()) {
-                    result.push(line);
-                }
-                line = reader.readLine();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return result;
     }
 }

@@ -3,6 +3,7 @@ package org.mikhan808.games.resistance;
 import org.mikhan808.Bot;
 import org.mikhan808.core.Game;
 import org.mikhan808.core.UserChat;
+import org.mikhan808.games.cardgames.detectiveclub.DetectiveUserChat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
@@ -49,9 +50,6 @@ public class ResistanceGame extends Game {
             }
 
             switch (user.getStatus()) {
-                case UserChat.ENTER_NAME:
-                    enterName(msg, user);
-                    break;
                 case UserChat.OK:
                     handleOk(msg, user);
                     break;
@@ -78,31 +76,23 @@ public class ResistanceGame extends Game {
     }
 
     @Override
+    protected void afterEnterCountPlayers(UserChat user) {
+        user.setStatus(DetectiveUserChat.OK);
+        bot.sendText(user.getId(), "Ок, ожидайте");
+        finishSetting = true;
+    }
+
+    @Override
+    protected void beginGame() {
+        startGame();
+    }
+
+    @Override
     public int getMinCountPlayers() {
         return 5;
     }
 
-    private void enterName(Message msg, UserChat user) {
-            if (!msg.hasText()) {
-                bot.sendText(user.getId(), "Отправьте текстом желаемое имя.");
-                return;
-            }
-            String name = msg.getText().trim();
-            if (name.isEmpty()) {
-                bot.sendText(user.getId(), "Имя не может быть пустым.");
-                return;
-            }
-            if (findUserByName(name) != null) {
-                bot.sendText(user.getId(), "Такое имя уже занято. Выберите другое.");
-                return;
-            }
-            user.setName(name);
-            user.setStatus(UserChat.OK);
-            sendLobbyState();
-            sendStartButtonToLeaderIfReady();
-        }
-
-        private void handleOk(Message msg, UserChat user) {
+    private void handleOk(Message msg, UserChat user) {
             if (msg.hasText() && START_GAME.equals(msg.getText())) {
                 if (!isLeader(user)) {
                     bot.sendText(user.getId(), "Только лидер может запускать игру.");
@@ -356,12 +346,6 @@ public class ResistanceGame extends Game {
             sendTextToAll("Победа Шпионов! " + (reason == null ? "" : reason));
             revealSpies();
             finishGame();
-        }
-
-        public void finishGame() {
-            sendTextToAll("Игра окончена.");
-            for (UserChat p : players) p.setGame(null);
-            bot.removeGame(this);
         }
 
         private String formatNames(List<UserChat> list) {

@@ -1,4 +1,4 @@
-package org.mikhan808.games.decoder;
+package org.mikhan808.games.cardgames.decoder;
 
 import org.telegram.telegrambots.meta.api.objects.Message;
 

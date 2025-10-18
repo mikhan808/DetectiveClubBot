@@ -1,33 +1,28 @@
-package org.mikhan808.games.decoder;
+package org.mikhan808.games.cardgames.decoder;
 
 import org.mikhan808.Bot;
-import org.mikhan808.core.Game;
 import org.mikhan808.core.UserChat;
+import org.mikhan808.games.cardgames.AbstractCardsGame;
+import org.mikhan808.games.cardgames.detectiveclub.DetectiveUserChat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+
 import java.util.ArrayList;
-import java.util.Collections;
+
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.Stack;
 
 
-public class DecoderGame extends Game {
+
+public class DecoderGame extends AbstractCardsGame {
     public static final String NAME="Декодер";
     public static final int MIN_COUNT_TEAMS = 2;
     public static final int WIN_CARDS = 2;
-    private static final String WORDS_RESOURCE_NAME = "Words.csv";
+
 
     private final List<Team> teams;
 
-    private Stack<String> cards;
     private int count_cards_on_hands = 4;
     private int countTeams = 2;
     private int indexActiveTeam = 0;
@@ -41,8 +36,6 @@ public class DecoderGame extends Game {
     public DecoderGame(Bot bot) {
         super(bot);
         teams = new ArrayList<>();
-        cards = getCards();
-        Collections.shuffle(cards, rand);
     }
 
     @Override
@@ -71,7 +64,7 @@ public class DecoderGame extends Game {
 
     private boolean finishedSettings() { return allPlayersJoined() && allTeamsNamed() && allPlayersAssignedToTeam(); }
 
-    private void beginGame() {
+    protected void beginGame() {
         sendTextToAll("Начинаем игру!");
         for (Team team : teams) {
             team.getCards().clear();
@@ -218,7 +211,7 @@ public class DecoderGame extends Game {
         boolean ownCorrect = activeTeam.hasOwnGuess() && matches(activeTeam.getOwnGuess(), code);
         if (!ownCorrect) {
             activeTeam.incrementLoseCards();
-            sb.append(activeTeam.getName()).append(" не угадала код.").append("\n");
+            sb.append(activeTeam.getName()).append(" не угадала код:").append(formatGuess(activeTeam.getOwnGuess())).append("\n");
         } else {
             sb.append(activeTeam.getName()).append(" верно угадала свой код: ").append(formatGuess(activeTeam.getOwnGuess())).append("\n");
         }
@@ -241,7 +234,14 @@ public class DecoderGame extends Game {
         activeTeam.setFirstTurn(false);
         boolean end = false;
         for (Team team : teams) {
-            if (team.getWinCards() == WIN_CARDS || team.getLoseCards() == WIN_CARDS) {
+            if (team.getWinCards() == WIN_CARDS ) {
+                sendTextToAll(team.getName()+ " победили");
+                end = true;
+                break;
+            }
+            if(team.getLoseCards() == WIN_CARDS)
+            {
+                sendTextToAll(team.getName()+ " проиграли");
                 end = true;
                 break;
             }
@@ -378,12 +378,6 @@ public class DecoderGame extends Game {
         return true;
     }
 
-    public void finishGame() {
-        sendTextToAll("Игра завершена");
-        for (UserChat u : players) u.setGame(null);
-        bot.removeGame(this);
-    }
-
     private void forwardMsgToTeam(Message message,Team team)
     {
         forwardMsgToList(message,team.getPlayers());
@@ -417,25 +411,6 @@ public class DecoderGame extends Game {
         requestAssociate();
     }
     private String codeToString() { StringBuilder x = new StringBuilder(); for (int i = 0; i < code.length; i++) { if (i != 0) x.append(", "); x.append(code[i] + 1);} return x.toString(); }
-    private String getNextCard() { if (cards.empty()) { cards = getCards(); Collections.shuffle(cards, rand);} return cards.pop(); }
-
-    private Stack<String> getCards() {
-        Stack<String> result = new Stack<>();
-        try {
-            InputStream is = DecoderGame.class.getClassLoader().getResourceAsStream(WORDS_RESOURCE_NAME);
-            if (is == null) throw new IOException("Resource not found: " + WORDS_RESOURCE_NAME);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-            String line = reader.readLine();
-            while (line != null) {
-                line = line.trim();
-                if (!line.isEmpty()) result.push(line);
-                line = reader.readLine();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return result;
-    }
 
     private Team findTeam(String name) {
         for (Team team : teams) if (team.getName() != null && name.trim().equalsIgnoreCase(team.getName())) return team;
@@ -449,12 +424,6 @@ public class DecoderGame extends Game {
         DecoderUserChat user = (DecoderUserChat) findUser(id);
         if (user != null) {
             switch (user.getStatus()) {
-                case DecoderUserChat.ENTER_NAME:
-                    enterName(msg, user);
-                    break;
-                case DecoderUserChat.ENTER_COUNT_PLAYERS:
-                    enterCountPlayers(msg, user);
-                    break;
                 case DecoderUserChat.ENTER_COUNT_TEAMS:
                     enterCountTeams(msg, user);
                     break;
@@ -494,45 +463,28 @@ public class DecoderGame extends Game {
     }
 
 
-    private void enterName(Message msg, DecoderUserChat user) {
+    protected void defaultAfterEnterName(UserChat userChat) {
+        DecoderUserChat user = (DecoderUserChat) userChat;
         Long id = user.getId();
-        String name = msg.getText();
-        DecoderUserChat userForName =(DecoderUserChat) findUserByName(name);
-        if (userForName == null) {
-            user.setName(name);
-            if (players.indexOf(user) == 0) {
-                bot.sendText(id, "Сколько игроков будет в игре?");
-                user.setStatus(DecoderUserChat.ENTER_COUNT_PLAYERS);
-            } else {
-                if (teams.size() < countTeams && players.indexOf(user) >= teams.size()) {
-                    createTeam(user);
-                    bot.sendText(id, "Введите название вашей команды");
-                    user.setStatus(DecoderUserChat.ENTER_NAME_TEAM);
-                } else {
-                    user.setStatus(DecoderUserChat.OK);
-                    bot.sendText(id, "Ожидайте, игра настраивается. Остальные команды ещё формируются.");
-                    // If everyone is ready, continue configuring the game automatically.
-                    if (allPlayersJoined() && allTeamsNamed()) {
-                        checkFinishSettingsForBeginGame(user);
-                    }
-                }
-            }
+        if (teams.size() < countTeams && players.indexOf(user) >= teams.size()) {
+            createTeam(user);
+            bot.sendText(id, "Введите название вашей команды");
+            user.setStatus(DecoderUserChat.ENTER_NAME_TEAM);
         } else {
-            bot.sendText(id, "Имя занято, введите другое");
+            user.setStatus(DecoderUserChat.OK);
+            bot.sendText(id, "Ожидайте, игра настраивается. Остальные команды ещё формируются.");
+            // If everyone is ready, continue configuring the game automatically.
+            if (allPlayersJoined() && allTeamsNamed()) {
+                checkFinishSettingsForBeginGame(user);
+            }
         }
     }
 
-    private void enterCountPlayers(Message msg, DecoderUserChat user) {
+    protected void afterEnterCountPlayers(UserChat user)
+    {
         Long id = user.getId();
-        try {
-            countPlayers = Integer.parseInt(msg.getText().trim());
-            bot.sendText(id, "Ок. Игроков будет: " + countPlayers);
-            bot.sendText(id, "Сколько карт на руках? (по умолчанию " + count_cards_on_hands + ")");
-            user.setStatus(DecoderUserChat.ENTER_COUNT_CARDS);
-        } catch (Exception e) {
-            bot.sendText(id, "Введите число");
-            user.setStatus(DecoderUserChat.ENTER_COUNT_PLAYERS);
-        }
+        bot.sendText(id, "Сколько карт на руках? (по умолчанию " + count_cards_on_hands + ")");
+        user.setStatus(DecoderUserChat.ENTER_COUNT_CARDS);
     }
 
     private void enterCountCards(Message msg, DecoderUserChat user) {
