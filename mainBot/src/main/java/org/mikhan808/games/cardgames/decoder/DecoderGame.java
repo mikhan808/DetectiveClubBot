@@ -3,7 +3,6 @@ package org.mikhan808.games.cardgames.decoder;
 import org.mikhan808.Bot;
 import org.mikhan808.core.UserChat;
 import org.mikhan808.games.cardgames.AbstractCardsGame;
-import org.mikhan808.games.cardgames.detectiveclub.DetectiveUserChat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
@@ -261,6 +260,15 @@ public class DecoderGame extends AbstractCardsGame {
         }
     }
 
+    protected void finishGame()
+    {
+        sendTextToAll("Карточки команд");
+        for(Team team:teams)
+            sendTextToAll(team.getName()+":\n"+team.getCardsToString());
+        sendTextToAll("Конец игры");
+        super.finishGame();
+    }
+
     private void handleOwnGuess(Message msg, DecoderUserChat user) {
         if (!msg.hasText()) return;
         Team team = user.getTeam();
@@ -337,7 +345,13 @@ public class DecoderGame extends AbstractCardsGame {
                 }
             }
         } else {
-            forwardMsgToTeam(msg,user.getTeam());
+            if(getActiveTeam()==user.getTeam())
+            {
+                forwardMsgToTeamWithoutActivePlayer(msg,user.getTeam());
+            }
+            else {
+                forwardMsgToTeam(msg, user.getTeam());
+            }
         }
     }
 
@@ -381,6 +395,12 @@ public class DecoderGame extends AbstractCardsGame {
     private void forwardMsgToTeam(Message message,Team team)
     {
         forwardMsgToList(message,team.getPlayers());
+    }
+    private void forwardMsgToTeamWithoutActivePlayer(Message message,Team team)
+    {
+        List<UserChat> list = new ArrayList<>(team.getPlayers());
+        list.remove(getActivePlayer());
+        forwardMsgToList(message,list);
     }
 
     private Team getActiveTeam() { return teams.get(indexActiveTeam); }
